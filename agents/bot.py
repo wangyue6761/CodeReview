@@ -163,7 +163,7 @@ class ReActAgent:
 
             **PR Diff** (full content):
             ```
-            {pr_diff[:1000]}
+            {pr_diff[:]}
             ```
 
             **Progress**: Iteration {iterations + 1}/{self.max_iterations} ({remaining_iterations} remaining)
