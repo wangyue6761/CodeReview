@@ -1,10 +1,12 @@
 """Agents module for LangGraph workflows and nodes."""
 
-from agents.bot import create_react_agent, run_react_agent, ReActAgent
+from agents.workflow import create_multi_agent_workflow, run_multi_agent_workflow
 
 __all__ = [
     "create_react_agent",
     "run_react_agent",
-    "ReActAgent"
+    "ReActAgent",
+    "create_multi_agent_workflow",
+    "run_multi_agent_workflow",
 ]
 

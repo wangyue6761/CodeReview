@@ -38,12 +38,14 @@ class SystemConfig(BaseModel):
         assets_dir: Directory for storing built assets.
         timeout_seconds: Maximum time for analysis (SLA: 10 minutes = 600 seconds).
         asset_key: Optional asset key for repository-specific assets (e.g., repo_map).
+        max_concurrent_llm_requests: Maximum number of concurrent LLM API requests (for concurrency control).
     """
     
     workspace_root: Path = Field(default=Path.cwd(), description="Workspace root path")
     assets_dir: Path = Field(default=Path("assets_cache"), description="Assets cache directory")
     timeout_seconds: int = Field(default=600, description="Analysis timeout in seconds")
     asset_key: Optional[str] = Field(default=None, description="Asset key for repository-specific assets")
+    max_concurrent_llm_requests: int = Field(default=5, ge=1, description="Maximum concurrent LLM API requests")
 
 
 class Config(BaseModel):
@@ -209,6 +211,11 @@ class Config(BaseModel):
         if os.getenv("TIMEOUT_SECONDS"):
             try:
                 system_config.timeout_seconds = int(os.getenv("TIMEOUT_SECONDS", str(system_config.timeout_seconds)))
+            except ValueError:
+                pass
+        if os.getenv("MAX_CONCURRENT_LLM_REQUESTS"):
+            try:
+                system_config.max_concurrent_llm_requests = int(os.getenv("MAX_CONCURRENT_LLM_REQUESTS", str(system_config.max_concurrent_llm_requests)))
             except ValueError:
                 pass
         

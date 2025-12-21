@@ -18,7 +18,7 @@ from typing import List, Optional
 from core.config import Config
 from dao.factory import get_storage
 from assets.implementations.repo_map import RepoMapBuilder
-from agents.bot import run_react_agent
+from agents.workflow import run_multi_agent_workflow
 from external_tools.syntax_checker import CheckerFactory, get_config
 from external_tools.syntax_checker.config_loader import create_checker_instance
 from util import (
@@ -29,6 +29,64 @@ from util import (
     validate_repo_path,
 )
 from util.git_utils import extract_files_from_diff, get_changed_files
+
+
+def _make_serializable(obj: dict) -> dict:
+    """Remove non-serializable objects from dictionary (e.g., LLMProvider, Config, tools).
+    
+    Args:
+        obj: Dictionary that may contain non-serializable objects.
+    
+    Returns:
+        Dictionary with only serializable values.
+    """
+    if not isinstance(obj, dict):
+        return obj
+    
+    result = {}
+    for key, value in obj.items():
+        if key == "metadata":
+            # Clean metadata: keep only serializable values
+            if isinstance(value, dict):
+                clean_metadata = {}
+                for meta_key, meta_value in value.items():
+                    # Skip non-serializable objects
+                    if meta_key in ["llm_provider", "config", "tools"]:
+                        # Store a string representation instead
+                        if meta_key == "config":
+                            clean_metadata[meta_key] = {
+                                "llm_provider": str(type(meta_value.llm.provider).__name__) if hasattr(meta_value, "llm") else None,
+                                "model": meta_value.llm.model if hasattr(meta_value, "llm") else None,
+                            }
+                        else:
+                            clean_metadata[meta_key] = str(type(meta_value).__name__)
+                    else:
+                        # Try to serialize, skip if not serializable
+                        try:
+                            json.dumps(meta_value)
+                            clean_metadata[meta_key] = meta_value
+                        except (TypeError, ValueError):
+                            clean_metadata[meta_key] = str(meta_value)
+                result[key] = clean_metadata
+            else:
+                result[key] = value
+        elif isinstance(value, dict):
+            result[key] = _make_serializable(value)
+        elif isinstance(value, list):
+            result[key] = [
+                _make_serializable(item) if isinstance(item, dict) else item
+                for item in value
+            ]
+        else:
+            # Try to serialize, skip if not serializable
+            try:
+                json.dumps(value)
+                result[key] = value
+            except (TypeError, ValueError):
+                result[key] = str(value)
+    
+    return result
+
 
 async def run_syntax_checking(
     repo_path: Path,
@@ -282,13 +340,37 @@ async def main():
     else:
         print("  ✅ No linting errors found")
     
-    # Step 3 & 4: Initialize and Run Autonomous ReAct Agent
-    print("\n🤖 Initializing autonomous ReAct agent...")
-    print("  → Agent will autonomously:")
+    # Step 3 & 4: Initialize and Run Multi-Agent Workflow
+    print("\n🤖 Initializing multi-agent workflow...")
+    print("  → Workflow will:")
+    print("    1. Analyze file intents in parallel")
+    print("    2. Manager routes tasks to expert agents")
+    print("    3. Expert agents validate risks with concurrency control")
+    print("    4. Generate final review report")
+    
+    # Get changed files list for the workflow
+    try:
+        if args.diff:
+            changed_files = extract_files_from_diff(pr_diff)
+        elif args.base:
+            try:
+                changed_files = get_changed_files(repo_path, args.base, args.head)
+            except Exception as e:
+                print(f"  ⚠️  Warning: Could not get changed files from Git: {e}")
+                changed_files = extract_files_from_diff(pr_diff)
+        else:
+            changed_files = extract_files_from_diff(pr_diff)
+    except Exception as e:
+        print(f"  ⚠️  Warning: Could not extract changed files: {e}")
+        changed_files = []
+    
+    if not changed_files:
+        print("  ⚠️  Warning: No changed files detected, workflow may not produce results")
     
     try:
-        results = await run_react_agent(
-            pr_diff=pr_diff,
+        results = await run_multi_agent_workflow(
+            diff_context=pr_diff,
+            changed_files=changed_files,
             config=config,
             lint_errors=lint_errors
         )
@@ -296,10 +378,14 @@ async def main():
         # Print results
         print_review_results(results, workspace_root=repo_path, config=config)
         
-        # Save results to file
+        # Save results to file (clean non-serializable objects from metadata)
         output_file = Path(args.output)
+        
+        # Create a serializable copy of results
+        serializable_results = _make_serializable(results)
+        
         with open(output_file, "w", encoding="utf-8") as f:
-            json.dump(results, f, indent=2, ensure_ascii=False)
+            json.dump(serializable_results, f, indent=2, ensure_ascii=False)
         print(f"\n💾 Results saved to: {output_file}")
         
     except Exception as e:
