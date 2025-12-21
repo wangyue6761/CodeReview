@@ -33,12 +33,11 @@ Generate a markdown-formatted report with the following structure:
 [List suggestions for improvement]
 
 ## Summary by Risk Type
-- Security: [count]
-- Performance: [count]
-- Maintainability: [count]
-- Bugs: [count]
-- Style: [count]
-- Architecture: [count]
+- Null Safety (空值陷阱与边界防御): [count]
+- Concurrency (并发竞争与异步时序): [count]
+- Security (安全漏洞与敏感数据): [count]
+- Business Intent (业务意图与功能对齐): [count]
+- Lifecycle (生命周期与状态副作用): [count]
 
 ## Recommendations
 [Overall recommendations for the codebase]

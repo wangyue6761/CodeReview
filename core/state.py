@@ -17,13 +17,20 @@ import operator
 
 
 class RiskType(str, Enum):
-    """Types of risks that can be identified in code review."""
-    SECURITY = "security"
-    PERFORMANCE = "performance"
-    MAINTAINABILITY = "maintainability"
-    BUG = "bug"
-    STYLE = "style"
-    ARCHITECTURE = "architecture"
+    """Types of risks that can be identified in code review.
+    
+    风险分类体系：
+    - NULL_SAFETY: 空值陷阱与边界防御 (Null Safety & Boundary Defense)
+    - CONCURRENCY: 并发竞争与异步时序 (Concurrency & Async Timing)
+    - SECURITY: 安全漏洞与敏感数据 (Security & Authorization)
+    - BUSINESS_INTENT: 业务意图与功能对齐 (Business Intent & Functional Alignment)
+    - LIFECYCLE: 生命周期与状态副作用 (Lifecycle, State & Side Effects)
+    """
+    NULL_SAFETY = "null_safety"  # 第二类：空值陷阱与边界防御
+    CONCURRENCY = "concurrency"  # 第三类：并发竞争与异步时序
+    SECURITY = "security"  # 第四类：安全漏洞与敏感数据
+    BUSINESS_INTENT = "business_intent"  # 第五类：业务意图与功能对齐
+    LIFECYCLE = "lifecycle"  # 第六类：生命周期与状态副作用
 
 
 class RiskItem(BaseModel):

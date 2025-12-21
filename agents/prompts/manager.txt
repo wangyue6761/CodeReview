@@ -11,7 +11,7 @@ Review the file analyses and create a prioritized work list of risk items that n
 
 For each potential risk identified in the file analyses:
 1. Determine if it needs expert validation
-2. Assign it to the most appropriate expert type (security, performance, maintainability, bug, style, architecture)
+2. Assign it to the most appropriate expert type (null_safety, concurrency, security, business_intent, lifecycle)
 3. Prioritize high-severity and high-confidence risks
 
 ## Output Format
@@ -20,7 +20,7 @@ Return a JSON object with the following structure:
 {{
     "work_list": [
         {{
-            "risk_type": "security|performance|maintainability|bug|style|architecture",
+            "risk_type": "null_safety|concurrency|security|business_intent|lifecycle",
             "file_path": "path/to/file.py",
             "line_number": 42,
             "description": "Detailed description of the risk that needs expert review",
@@ -35,15 +35,14 @@ Return a JSON object with the following structure:
 ## Guidelines
 - Create a work list item for each risk that needs expert validation
 - Group similar risks together when possible
-- Prioritize security and bug risks
+- Prioritize security and null_safety risks
 - Include context about why this risk needs expert review
 - Set appropriate confidence scores (0.0 to 1.0)
 - Use severity levels: "error" for critical issues, "warning" for important issues, "info" for suggestions
 
 ## Expert Types
-- **security**: Security vulnerabilities, authentication, authorization, data leaks
-- **performance**: Performance bottlenecks, inefficient algorithms, resource usage
-- **maintainability**: Code quality, readability, technical debt, refactoring needs
-- **bug**: Potential bugs, logic errors, edge cases, error handling
-- **style**: Code style, naming conventions, formatting, best practices
-- **architecture**: Design patterns, architectural decisions, coupling, cohesion
+- **null_safety**: 空值陷阱与边界防御 (Null Safety & Boundary Defense) - 未处理数据缺失、空集合或非法格式
+- **concurrency**: 并发竞争与异步时序 (Concurrency & Async Timing) - 多线程、异步回调或执行顺序依赖问题
+- **security**: 安全漏洞与敏感数据 (Security & Authorization) - 未授权访问、数据泄露或注入风险
+- **business_intent**: 业务意图与功能对齐 (Business Intent & Functional Alignment) - 代码逻辑与业务需求不符
+- **lifecycle**: 生命周期与状态副作用 (Lifecycle, State & Side Effects) - 对象/资源创建销毁、全局状态管理、缓存一致性

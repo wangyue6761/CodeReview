@@ -152,7 +152,7 @@ async def run_expert_group(
     control to limit simultaneous LLM API calls.
     
     Args:
-        risk_type_str: Risk type as string (e.g., "security", "performance").
+        risk_type_str: Risk type as string (e.g., "null_safety", "concurrency", "security").
         tasks: List of RiskItem objects to process.
         global_state: Global workflow state for context.
         llm_provider: LLM provider instance.
@@ -245,15 +245,18 @@ async def _process_risk_item(
     
     try:
         # Load initial expert prompt
+        # Note: validation_logic_examples 由用户手动在模板文件中填写，不需要动态填充
         try:
             initial_prompt = render_prompt_template(
                 f"expert_{risk_type_str}",
+                risk_type=risk_type_str,
                 risk_item=risk_item.model_dump(),
                 file_path=risk_item.file_path,
                 line_number=risk_item.line_number,
                 description=risk_item.description,
                 diff_context=_extract_file_diff(diff_context, risk_item.file_path),
-                available_tools=", ".join(tool_dict.keys())
+                available_tools=", ".join(tool_dict.keys()),
+                validation_logic_examples=""  # 占位符，用户会在模板文件中手动填写内容
             )
         except FileNotFoundError:
             # Fallback to generic expert prompt

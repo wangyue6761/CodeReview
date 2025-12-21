@@ -96,12 +96,19 @@ async def intent_analysis_node(state: ReviewState) -> Dict[str, Any]:
                 # 我们不能使用 ChatPromptTemplate（它会尝试解析 JSON 中的大括号作为变量）
                 # 应该直接使用 HumanMessage 和 SystemMessage
                 
+                # 获取危险模式配置（从 metadata 或使用默认值）
+                dangerous_patterns = state.get("metadata", {}).get(
+                    "dangerous_patterns",
+                    "（危险模式配置将在后续填充）"
+                )
+                
                 # 渲染提示模板（已经完成变量替换）
                 rendered_prompt = render_prompt_template(
                     "intent_analysis",
                     file_path=file_path,
                     file_diff=file_diff,
-                    diff_context=diff_context[:2000]  # Limit context size
+                    diff_context=diff_context[:2000],  # Limit context size
+                    dangerous_patterns=dangerous_patterns
                 )
                 
                 # 重构说明：使用 PydanticOutputParser 直接解析为 FileAnalysis 模型
@@ -240,7 +247,7 @@ def _parse_intent_analysis_response(response: str, file_path: str) -> FileAnalys
                         continue
                     
                     risk_item = RiskItem(
-                        risk_type=RiskType(risk_data.get("risk_type", "maintainability")),
+                        risk_type=RiskType(risk_data.get("risk_type", "null_safety")),
                         file_path=risk_data.get("file_path", file_path),
                         line_number=line_number,
                         description=risk_data.get("description", ""),
