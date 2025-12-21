@@ -15,6 +15,7 @@ from core.llm import LLMProvider
 from core.config import Config
 from tools.repo_tools import FetchRepoMapTool
 from tools.file_tools import ReadFileTool
+from agents.prompts import render_prompt_template
 
 # Set up logger
 logger = logging.getLogger(__name__)
@@ -157,59 +158,19 @@ class ReActAgent:
         if remaining_iterations <= 2:
             max_iterations_warning = f"\n⚠️ IMPORTANT: You are approaching the maximum iteration limit ({remaining_iterations} remaining). Please provide your final review now."
         
-        prompt = f"""You are an autonomous code review expert. Your task is to review a Git PR diff and identify issues.
-
-            ## Current Context
-
-            **PR Diff** (full content):
-            ```
-            {pr_diff[:]}
-            ```
-
-            **Progress**: Iteration {iterations + 1}/{self.max_iterations} ({remaining_iterations} remaining)
-
-            ## Previous Observations
-
-            {observations_text}
-
-            ## Previous Tool Results
-
-            {tool_results_text}
-
-            {tool_guidance}
-            {max_iterations_warning}
-
-            ## Available Tools
-
-            {available_tools}
-
-            ## Instructions
-
-            1. Review the PR diff carefully - identify all changed files and understand what was modified.
-
-            2. Use tools strategically:
-            - Use `fetch_repo_map` to understand the repository structure (if needed)
-            - Use `read_file` to examine specific files mentioned in the diff
-            - Check previous tool results above - do NOT re-read files you've already examined
-
-            3. When you have enough information:
-            - Analyze the code changes for potential issues (bugs, security, performance, style, etc.)
-            - Provide your review using the format below
-
-            4. Response Format:
-
-            To use a tool:
-            ```
-            Action: tool_name
-            Action Input: {{"param": "value"}}
-            ```
-
-            To provide final review:
-            ```
-            Final Answer: [{{"file": "path/to/file.py", "line": 42, "severity": "error|warning|info", "message": "Issue description", "suggestion": "Optional fix suggestion"}}]
-            ```
-
-            ## What would you like to do next?"""
+        # Load prompt template from file
+        prompt = render_prompt_template(
+            "react_agent",
+            pr_diff=pr_diff,
+            current_iteration=iterations + 1,
+            max_iterations=self.max_iterations,
+            remaining_iterations=remaining_iterations,
+            observations_text=observations_text,
+            tool_results_text=tool_results_text,
+            tool_guidance=tool_guidance,
+            max_iterations_warning=max_iterations_warning,
+            available_tools=available_tools
+        )
 
         # Get LLM response
         response = await self.llm_provider.generate(prompt, temperature=0.7)

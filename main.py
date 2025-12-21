@@ -19,7 +19,8 @@ from core.config import Config
 from dao.factory import get_storage
 from assets.implementations.repo_map import RepoMapBuilder
 from agents.bot import run_react_agent
-from external_tools.syntax_checker import CheckerFactory
+from external_tools.syntax_checker import CheckerFactory, get_config
+from external_tools.syntax_checker.config_loader import create_checker_instance
 from util import (
     generate_asset_key,
     get_git_info,
@@ -76,9 +77,13 @@ async def run_syntax_checking(
         
         # Run all checkers
         all_errors = []
+        config = get_config()
+        
         for checker_class, files in checker_groups.items():
             try:
-                checker = checker_class()
+                # Create checker instance with configuration (if available)
+                checker = create_checker_instance(checker_class, config)
+                
                 errors = await checker.check(repo_path, files)
                 # Convert LintError objects to dictionaries
                 all_errors.extend([

@@ -1,0 +1,32 @@
+# Configuration for syntax checkers.
+# This file controls which syntax checkers are enabled for different file types.
+# Checkers can be enabled or disabled by setting their status to 'enabled' or 'disabled'.
+
+# Python checkers configuration
+python:
+  # Pylint checker
+  pylint:
+    enabled: true
+    # Pylint command-line arguments
+    # --disable=all: Disable all checks by default
+    # --enable=E0611,E0401,E1101,E0602: Enable specific error codes
+    args: "--disable=all --enable=E0611,E0401,E1101,E0602"
+    # Error codes mapping to severity
+    # E = error, W = warning, C = convention, R = refactor, I = info
+    severity_map:
+      E: "error"
+      W: "warning"
+      C: "info"
+      R: "info"
+      I: "info"
+  
+  # Ruff checker
+  ruff:
+    enabled: false
+    args: "--output-format=json"
+
+# Future: Add configurations for other languages
+# javascript:
+#   eslint:
+#     enabled: true
+#     args: "--format json"
