@@ -79,10 +79,13 @@ async def manager_node(state: ReviewState) -> Dict[str, Any]:
         # 这是 LangGraph 标准做法，替代手动 JSON 解析
         parser = PydanticOutputParser(pydantic_object=WorkListResponse)
         
+        # 生成展开的格式说明（包含 RiskItem 的完整结构）
+        format_instructions = _get_expanded_format_instructions(parser)
+        
         # 创建消息列表（直接使用已渲染的文本，避免 ChatPromptTemplate 解析 JSON 示例）
         messages = [
             SystemMessage(content="You are a Manager Agent for code review. Generate a work list of tasks for expert agents."),
-            HumanMessage(content=rendered_prompt + "\n\n" + parser.get_format_instructions())
+            HumanMessage(content=rendered_prompt + "\n\n" + format_instructions)
         ]
         
         print("  🤖 调用 LLM 生成工作列表...")
@@ -156,6 +159,78 @@ def _format_file_analyses(file_analyses: List[Any]) -> str:
 # 2. 自动处理 line_number 等必需字段的验证
 # 3. 提供更好的错误信息
 # 4. 符合 LangGraph 标准做法
+
+
+def _get_expanded_format_instructions(parser: PydanticOutputParser) -> str:
+    """Generate expanded format instructions that include nested model structures.
+    
+    This function expands the JSON schema to show the full structure of nested models
+    (like RiskItem) instead of just references.
+    
+    Args:
+        parser: PydanticOutputParser instance.
+    
+    Returns:
+        Expanded format instructions string.
+    """
+    import json
+    
+    # Get the JSON schema from the Pydantic model
+    schema = WorkListResponse.model_json_schema()
+    
+    # Expand the schema to resolve $ref references
+    def expand_refs(schema_dict: dict, definitions: dict = None) -> dict:
+        """Recursively expand $ref references in the schema."""
+        if definitions is None:
+            definitions = schema_dict.get("$defs", {})
+        
+        if isinstance(schema_dict, dict):
+            if "$ref" in schema_dict:
+                # Resolve the reference
+                ref_path = schema_dict["$ref"]
+                if ref_path.startswith("#/$defs/"):
+                    def_name = ref_path.split("/")[-1]
+                    if def_name in definitions:
+                        # Recursively expand the referenced definition
+                        expanded = expand_refs(definitions[def_name], definitions)
+                        return expanded
+            else:
+                # Recursively process all values
+                return {k: expand_refs(v, definitions) for k, v in schema_dict.items()}
+        elif isinstance(schema_dict, list):
+            return [expand_refs(item, definitions) for item in schema_dict]
+        else:
+            return schema_dict
+    
+    # Expand the schema
+    expanded_schema = expand_refs(schema)
+    
+    # Remove $defs since we've expanded all references
+    if "$defs" in expanded_schema:
+        del expanded_schema["$defs"]
+    
+    # Generate a clean JSON schema string
+    schema_str = json.dumps(expanded_schema, indent=2, ensure_ascii=False)
+    
+    # Get enum values dynamically
+    risk_type_values = [rt.value for rt in RiskType]
+    risk_type_str = ", ".join([f'"{v}"' for v in risk_type_values])
+    
+    # Create expanded format instructions
+    expanded_instructions = f"""You must respond with a JSON object that matches the following schema:
+
+        {schema_str}
+
+        Important notes:
+        - The "risk_type" field must be one of: {risk_type_str}
+        - The "line_number" field must be a positive integer (1-indexed)
+        - The "confidence" field must be a float between 0.0 and 1.0
+        - The "severity" field must be one of: "error", "warning", "info"
+        - The "suggestion" field is optional (can be null or omitted)
+
+        Return only the JSON object, without any markdown code blocks or additional text."""
+    
+    return expanded_instructions
 
 
 def _group_tasks_by_risk_type(work_list: List[RiskItem]) -> Dict[str, List[RiskItem]]:

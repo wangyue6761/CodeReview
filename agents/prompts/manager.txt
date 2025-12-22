@@ -14,24 +14,6 @@ For each potential risk identified in the file analyses:
 2. Assign it to the most appropriate expert type (null_safety, concurrency, security, business_intent, lifecycle)
 3. Prioritize high-severity and high-confidence risks
 
-## Output Format
-Return a JSON object with the following structure:
-```json
-{{
-    "work_list": [
-        {{
-            "risk_type": "null_safety|concurrency|security|business_intent|lifecycle",
-            "file_path": "path/to/file.py",
-            "line_number": 42,
-            "description": "Detailed description of the risk that needs expert review",
-            "confidence": 0.6,
-            "severity": "error|warning|info",
-            "suggestion": "Optional initial suggestion"
-        }}
-    ]
-}}
-```
-
 ## Guidelines
 - Create a work list item for each risk that needs expert validation
 - Group similar risks together when possible
