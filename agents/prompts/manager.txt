@@ -11,7 +11,7 @@ Review the file analyses and create a prioritized work list of risk items that n
 
 For each potential risk identified in the file analyses:
 1. Determine if it needs expert validation
-2. Assign it to the most appropriate expert type (null_safety, concurrency, security, business_intent, lifecycle)
+2. Assign it to the most appropriate expert type (null_safety, concurrency, security, business_intent, lifecycle, syntax)
 3. Prioritize high-severity and high-confidence risks
 
 ## Guidelines
@@ -28,3 +28,4 @@ For each potential risk identified in the file analyses:
 - **security**: 安全漏洞与敏感数据 (Security & Authorization) - 未授权访问、数据泄露或注入风险
 - **business_intent**: 业务意图与功能对齐 (Business Intent & Functional Alignment) - 代码逻辑与业务需求不符
 - **lifecycle**: 生命周期与状态副作用 (Lifecycle, State & Side Effects) - 对象/资源创建销毁、全局状态管理、缓存一致性
+- **syntax**: 语法与静态分析 (Syntax & Static Analysis) - 语法错误、类型错误、未定义变量、导入错误等静态分析问题

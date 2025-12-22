@@ -105,6 +105,13 @@ async def manager_node(state: ReviewState) -> Dict[str, Any]:
             for analysis in file_analyses:
                 work_list.extend(analysis.potential_risks)
         
+        # Convert lint_errors to RiskItems and add to work_list
+        lint_errors = state.get("lint_errors", [])
+        if lint_errors:
+            lint_risk_items = _convert_lint_errors_to_risk_items(lint_errors)
+            work_list.extend(lint_risk_items)
+            print(f"  📋 添加语法分析任务: {len(lint_risk_items)} 个")
+        
         # Group work_list by risk_type
         expert_tasks = _group_tasks_by_risk_type(work_list)
         
@@ -231,6 +238,47 @@ def _get_expanded_format_instructions(parser: PydanticOutputParser) -> str:
         Return only the JSON object, without any markdown code blocks or additional text."""
     
     return expanded_instructions
+
+
+def _convert_lint_errors_to_risk_items(lint_errors: List[Dict[str, Any]]) -> List[RiskItem]:
+    """Convert lint errors to RiskItem objects.
+    
+    Args:
+        lint_errors: List of lint error dictionaries with keys: file, line, message, severity, code.
+    
+    Returns:
+        List of RiskItem objects with risk_type=syntax.
+    """
+    risk_items = []
+    for error in lint_errors:
+        try:
+            file_path = error.get("file", "")
+            line_number = error.get("line", 1)
+            message = error.get("message", "")
+            severity = error.get("severity", "error")
+            code = error.get("code", "")
+            
+            # Build description with error code if available
+            if code:
+                description = f"[{code}] {message}"
+            else:
+                description = message
+            
+            risk_item = RiskItem(
+                risk_type=RiskType.SYNTAX,
+                file_path=file_path,
+                line_number=int(line_number) if line_number else 1,
+                description=description,
+                confidence=0.8,  # Lint errors have high confidence from static analysis
+                severity=severity,
+                suggestion=None  # Expert will provide suggestions
+            )
+            risk_items.append(risk_item)
+        except Exception as e:
+            logger.warning(f"Failed to convert lint error to RiskItem: {e}, error: {error}")
+            continue
+    
+    return risk_items
 
 
 def _group_tasks_by_risk_type(work_list: List[RiskItem]) -> Dict[str, List[RiskItem]]:

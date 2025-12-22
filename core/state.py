@@ -25,12 +25,14 @@ class RiskType(str, Enum):
     - SECURITY: 安全漏洞与敏感数据 (Security & Authorization)
     - BUSINESS_INTENT: 业务意图与功能对齐 (Business Intent & Functional Alignment)
     - LIFECYCLE: 生命周期与状态副作用 (Lifecycle, State & Side Effects)
+    - SYNTAX: 语法与静态分析 (Syntax & Static Analysis)
     """
     NULL_SAFETY = "null_safety"  # 第二类：空值陷阱与边界防御
     CONCURRENCY = "concurrency"  # 第三类：并发竞争与异步时序
     SECURITY = "security"  # 第四类：安全漏洞与敏感数据
     BUSINESS_INTENT = "business_intent"  # 第五类：业务意图与功能对齐
     LIFECYCLE = "lifecycle"  # 第六类：生命周期与状态副作用
+    SYNTAX = "syntax"  # 语法与静态分析
 
 
 class RiskItem(BaseModel):

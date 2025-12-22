@@ -38,6 +38,7 @@ Generate a markdown-formatted report with the following structure:
 - Security (安全漏洞与敏感数据): [count]
 - Business Intent (业务意图与功能对齐): [count]
 - Lifecycle (生命周期与状态副作用): [count]
+- Syntax (语法与静态分析): [count]
 
 ## Recommendations
 [Overall recommendations for the codebase]
