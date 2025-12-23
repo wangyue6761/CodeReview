@@ -135,8 +135,15 @@ def _generate_simple_report(confirmed_issues: List[RiskItem]) -> str:
         if severity in by_severity:
             report_lines.append(f"\n### {severity.upper()} ({len(by_severity[severity])})")
             for issue in by_severity[severity]:
+                # Format line number range: (10, 15) -> "10:15", (10, 10) -> "10"
+                start_line, end_line = issue.line_number
+                if start_line == end_line:
+                    line_str = str(start_line)
+                else:
+                    line_str = f"{start_line}:{end_line}"
+                
                 report_lines.append(
-                    f"- **{issue.file_path}:{issue.line_number}** "
+                    f"- **{issue.file_path}:{line_str}** "
                     f"[{issue.risk_type.value}] "
                     f"(confidence: {issue.confidence:.2f})\n"
                     f"  {issue.description}"

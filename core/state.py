@@ -8,9 +8,9 @@ in the LangGraph workflow.
 - 这是 LangGraph 标准做法，用于在节点间传递对话历史
 """
 
-from typing import TypedDict, List, Dict, Any, Optional, Annotated, Literal
+from typing import TypedDict, List, Dict, Any, Optional, Annotated, Literal, Tuple
 from enum import Enum
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 from langchain_core.messages import BaseMessage
 from langgraph.graph.message import add_messages
 import operator
@@ -41,7 +41,8 @@ class RiskItem(BaseModel):
     Attributes:
         risk_type: The type of risk (security, performance, etc.).
         file_path: Path to the file where the risk was identified.
-        line_number: Line number where the risk occurs (1-indexed).
+        line_number: Line number range where the risk occurs (start_line, end_line), both 1-indexed.
+                     Must always be provided as [start, end]. For single-line issues, use [line, line].
         description: Description of the risk.
         confidence: Confidence score (0.0 to 1.0).
         severity: Severity level ("error", "warning", "info").
@@ -49,11 +50,53 @@ class RiskItem(BaseModel):
     """
     risk_type: RiskType = Field(..., description="Type of risk")
     file_path: str = Field(..., description="File path where risk was identified")
-    line_number: int = Field(..., description="Line number (1-indexed)")
+    line_number: Tuple[int, int] = Field(..., description="Line number range (start_line, end_line), both 1-indexed")
     description: str = Field(..., description="Description of the risk")
     confidence: float = Field(default=0.5, ge=0.0, le=1.0, description="Confidence score")
     severity: str = Field(default="warning", description="Severity: error, warning, or info")
     suggestion: Optional[str] = Field(default=None, description="Optional suggestion for fixing")
+    
+    @field_validator('line_number', mode='before')
+    @classmethod
+    def normalize_line_number(cls, v: Any) -> Tuple[int, int]:
+        """Normalize line_number to a tuple (start_line, end_line).
+        
+        Requires:
+        - List/tuple of exactly 2 integers: [start, end] or (start, end)
+        - Single integer is NOT supported - must always provide a range
+        
+        Args:
+            v: Input value, must be a list/tuple of 2 integers.
+        
+        Returns:
+            Tuple of (start_line, end_line).
+        
+        Raises:
+            ValueError: If input is not a list/tuple of 2 integers.
+        """
+        if isinstance(v, (list, tuple)):
+            if len(v) == 2:
+                start, end = int(v[0]), int(v[1])
+                if start > end:
+                    raise ValueError(f"start_line ({start}) must be <= end_line ({end})")
+                if start < 1:
+                    raise ValueError(f"start_line ({start}) must be >= 1 (1-indexed)")
+                return (start, end)
+            else:
+                raise ValueError(
+                    f"line_number must be a list/tuple of exactly 2 integers [start, end], "
+                    f"got {len(v)} element(s): {v}"
+                )
+        elif isinstance(v, int):
+            raise ValueError(
+                f"line_number must be a list/tuple of 2 integers [start, end], "
+                f"not a single integer. For single-line issues, use [line, line]. Got: {v}"
+            )
+        else:
+            raise ValueError(
+                f"line_number must be a list/tuple of 2 integers [start, end], "
+                f"got {type(v).__name__}: {v}"
+            )
 
 
 class FileAnalysis(BaseModel):

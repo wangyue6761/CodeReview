@@ -264,10 +264,12 @@ def _convert_lint_errors_to_risk_items(lint_errors: List[Dict[str, Any]]) -> Lis
             else:
                 description = message
             
+            # Convert single line number to range format [line, line]
+            line_num = int(line_number) if line_number else 1
             risk_item = RiskItem(
                 risk_type=RiskType.SYNTAX,
                 file_path=file_path,
-                line_number=int(line_number) if line_number else 1,
+                line_number=[line_num, line_num],  # Must be [start, end] format
                 description=description,
                 confidence=0.8,  # Lint errors have high confidence from static analysis
                 severity=severity,

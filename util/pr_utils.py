@@ -82,7 +82,13 @@ def print_review_results(results: dict, workspace_root: Optional[Path] = None, c
                 for issue in severity_issues:
                     # Support both old format and new RiskItem format
                     file_path = issue.get("file_path") or issue.get("file", "unknown")
-                    line = issue.get("line_number") or issue.get("line", 0)
+                    line_number = issue.get("line_number") or issue.get("line", 0)
+                    # Format line number range: (10, 15) -> "10:15", (10, 10) or 10 -> "10"
+                    if isinstance(line_number, (list, tuple)) and len(line_number) == 2:
+                        start, end = line_number
+                        line = f"{start}:{end}" if start != end else str(start)
+                    else:
+                        line = str(line_number) if line_number else "0"
                     message = issue.get("description") or issue.get("message", "")
                     suggestion = issue.get("suggestion", "")
                     risk_type = issue.get("risk_type", "")

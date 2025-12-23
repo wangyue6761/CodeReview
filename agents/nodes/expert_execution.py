@@ -19,6 +19,22 @@ from agents.prompts import render_prompt_template
 logger = logging.getLogger(__name__)
 
 
+def format_line_number(line_number: tuple[int, int]) -> str:
+    """Format line number range as a string.
+    
+    Args:
+        line_number: Tuple of (start_line, end_line).
+    
+    Returns:
+        Formatted string: "10:15" for range, "10" for single line.
+    """
+    start_line, end_line = line_number
+    if start_line == end_line:
+        return str(start_line)
+    else:
+        return f"{start_line}:{end_line}"
+
+
 async def expert_execution_node(state: ReviewState) -> Dict[str, Any]:
     """Execute expert agents in parallel with concurrency control.
     
@@ -185,7 +201,8 @@ async def run_expert_group(
                     diff_context=diff_context
                 )
             except Exception as e:
-                logger.error(f"Error processing risk item {task.file_path}:{task.line_number}: {e}")
+                line_str = format_line_number(task.line_number)
+                logger.error(f"Error processing risk item {task.file_path}:{line_str}: {e}")
                 return None
     
     # Process all tasks concurrently (with semaphore limiting)
@@ -246,13 +263,16 @@ async def _process_risk_item(
     try:
         # Load initial expert prompt
         # Note: validation_logic_examples 由用户手动在模板文件中填写，不需要动态填充
+        # Format line number range for display in prompts
+        line_number_str = format_line_number(risk_item.line_number)
+        
         try:
             initial_prompt = render_prompt_template(
                 f"expert_{risk_type_str}",
                 risk_type=risk_type_str,
                 risk_item=risk_item.model_dump(),
                 file_path=risk_item.file_path,
-                line_number=risk_item.line_number,
+                line_number=line_number_str,  # Format as string for prompt display
                 description=risk_item.description,
                 diff_context=_extract_file_diff(diff_context, risk_item.file_path),
                 available_tools=", ".join(tool_dict.keys()),
@@ -265,7 +285,7 @@ async def _process_risk_item(
                 risk_type=risk_type_str,
                 risk_item=risk_item.model_dump(),
                 file_path=risk_item.file_path,
-                line_number=risk_item.line_number,
+                line_number=line_number_str,  # Format as string for prompt display
                 description=risk_item.description,
                 diff_context=_extract_file_diff(diff_context, risk_item.file_path),
                 available_tools=", ".join(tool_dict.keys())
@@ -369,7 +389,8 @@ async def _process_risk_item(
                         "\nBased on the tool results above, please:" +
                         "\n1. Continue your analysis if you need more information (call more tools)" +
                         "\n2. Provide your final validated result in JSON format if you have sufficient information" +
-                        "\n3. Format your final result as: {\"risk_type\": \"...\", \"file_path\": \"...\", \"line_number\": ..., \"description\": \"...\", \"confidence\": ..., \"severity\": \"...\", \"suggestion\": \"...\"}"
+                        "\n3. Format your final result as: {\"risk_type\": \"...\", \"file_path\": \"...\", \"line_number\": [start, end], \"description\": \"...\", \"confidence\": ..., \"severity\": \"...\", \"suggestion\": \"...\"}"
+                        "\n   NOTE: line_number MUST be an array [start, end]. For single line, use [line, line]."
                     )
                 else:
                     current_prompt = (
@@ -382,7 +403,8 @@ async def _process_risk_item(
                         "\nBased on the tool results above, please:" +
                         "\n1. Continue your analysis if you need more information (call more tools)" +
                         "\n2. Provide your final validated result in JSON format if you have sufficient information" +
-                        "\n3. Format your final result as: {\"risk_type\": \"...\", \"file_path\": \"...\", \"line_number\": ..., \"description\": \"...\", \"confidence\": ..., \"severity\": \"...\", \"suggestion\": \"...\"}"
+                        "\n3. Format your final result as: {\"risk_type\": \"...\", \"file_path\": \"...\", \"line_number\": [start, end], \"description\": \"...\", \"confidence\": ..., \"severity\": \"...\", \"suggestion\": \"...\"}"
+                        "\n   NOTE: line_number MUST be an array [start, end]. For single line, use [line, line]."
                     )
             else:
                 # No tool calls - check if this is first turn
@@ -403,7 +425,8 @@ async def _process_risk_item(
         # If we reached max iterations, use the last response
         if iteration >= max_iterations:
             expert_analysis["final_response"] = response
-            logger.warning(f"Reached max iterations ({max_iterations}) for risk item {risk_item.file_path}:{risk_item.line_number}")
+            line_str = format_line_number(risk_item.line_number)
+            logger.warning(f"Reached max iterations ({max_iterations}) for risk item {risk_item.file_path}:{line_str}")
         
         # Parse final response to get validated risk item
         validated_item = _parse_expert_response(expert_analysis["final_response"], risk_item)

@@ -258,23 +258,19 @@ def _parse_intent_analysis_response(response: str, file_path: str) -> FileAnalys
             for risk_data in potential_risks_data:
                 try:
                     # 修复说明：line_number 是必需字段，不能为 None 或无效
-                    # 如果缺失或无效，记录错误并跳过该项
+                    # 必须提供 [start, end] 格式，field_validator 会验证格式
                     line_number = risk_data.get("line_number")
                     if line_number is None:
                         logger.error(f"Missing line_number in risk item: {risk_data}, file_path: {file_path}")
                         continue
                     
-                    # 尝试转换为整数
-                    try:
-                        line_number = int(line_number)
-                    except (ValueError, TypeError) as e:
-                        logger.error(f"Invalid line_number '{line_number}' in risk item: {risk_data}, file_path: {file_path}, error: {e}")
-                        continue
+                    # field_validator 会验证 line_number 必须是 [start, end] 格式
+                    # 如果格式不正确会抛出 ValueError
                     
                     risk_item = RiskItem(
                         risk_type=RiskType(risk_data.get("risk_type", "null_safety")),
                         file_path=risk_data.get("file_path", file_path),
-                        line_number=line_number,
+                        line_number=line_number,  # 必须是 [start, end] 格式
                         description=risk_data.get("description", ""),
                         confidence=risk_data.get("confidence", 0.5),
                         severity=risk_data.get("severity", "info"),

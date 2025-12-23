@@ -16,5 +16,5 @@ system:
   workspace_root: "."           # Root directory of the workspace
   assets_dir: "assets_cache"    # Directory for storing built assets
   timeout_seconds: 600           # Maximum time for analysis (10 minutes)
-  max_concurrent_llm_requests: 1
+  max_concurrent_llm_requests: 10
 

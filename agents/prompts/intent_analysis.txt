@@ -185,5 +185,5 @@ Below are the five risk categories you should use when identifying potential ris
     - `warning`: Important issues that should be addressed
     - `info`: Suggestions for improvement
 - **When you identify a pattern from the dangerous patterns list**, mark it with high confidence (≥ 0.7)
-- **Include line numbers** accurately based on the diff context
+- **Include line numbers** accurately based on the diff context. **IMPORTANT**: line_number must always be provided as an array [start, end]. For single-line issues, use [line, line]. Example: [10, 15] for a range, [10, 10] for a single line.
 - **Provide actionable suggestions** when possible
