@@ -239,6 +239,25 @@ def _format_file_analyses(file_analyses: List[Any]) -> str:
         )
     return "\n".join(summaries)
 
+def _format_work_list(work_list: List[Any]) -> str:
+    """Format file analyses for prompt.
+
+    Args:
+        file_analyses: List of FileAnalysis objects.
+
+    Returns:
+        Formatted string summary.
+    """
+    summaries = []
+    for w in work_list:
+        summaries.append(
+            f"File: {w.file_path}\n"
+            f"Line Number: {w.line_number}\n"
+            f"Confidence: {w.confidence}\n"
+            f"Risk Type: {w.risk_type}\n"
+            f"Description: {w.description}\n"
+        )
+    return "\n".join(summaries)
 
 # 重构说明：_parse_manager_response 函数已被移除
 # 现在使用 PydanticOutputParser 直接解析为 WorkListResponse 模型
