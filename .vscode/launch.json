@@ -8,11 +8,11 @@
             "program": "${workspaceFolder}/main.py",
             "args": [
                 "--repo",
-                "/Users/wangyue/Code/CodeReviewData/ReviewDataset/cal.com-greptile",
+                "/Users/wangyue/Code/CodeReviewData/ReviewDataset/sentry-greptile",
                 "--base",
-                "appstore-sync-refactor-base",
+                "master",
                 "--head",
-                "appstore-async-improvements"
+                "performance-enhancement-complete"
             ],
             "console": "integratedTerminal",
             "justMyCode": false,

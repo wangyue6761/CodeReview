@@ -69,7 +69,7 @@ def create_multi_agent_workflow(
     workspace_root = config.system.workspace_root
     asset_key = config.system.asset_key
     tools = [
-        FetchRepoMapTool(asset_key=asset_key),
+        # FetchRepoMapTool(asset_key=asset_key),
         ReadFileTool(workspace_root=workspace_root)
     ]
     

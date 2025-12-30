@@ -70,7 +70,6 @@ async def manager_node(state: ReviewState) -> Dict[str, Any]:
         # 渲染提示模板（已经完成变量替换）
         rendered_prompt = render_prompt_template(
             "manager",
-            diff_context=diff_context[:3000],  # Limit context size
             file_analyses_summary=analyses_summary,
             num_files=len(file_analyses)
         )
@@ -79,20 +78,17 @@ async def manager_node(state: ReviewState) -> Dict[str, Any]:
         # 这是 LangGraph 标准做法，替代手动 JSON 解析
         parser = PydanticOutputParser(pydantic_object=WorkListResponse)
         
-        # 生成展开的格式说明（包含 RiskItem 的完整结构）
-        format_instructions = _get_expanded_format_instructions(parser)
-        
         # 创建消息列表（直接使用已渲染的文本，避免 ChatPromptTemplate 解析 JSON 示例）
         messages = [
             SystemMessage(content="You are a Manager Agent for code review. Generate a work list of tasks for expert agents."),
-            HumanMessage(content=rendered_prompt + "\n\n" + format_instructions)
+            HumanMessage(content=rendered_prompt + "\n\n" + parser.get_format_instructions())
         ]
         
         print("  🤖 调用 LLM 生成工作列表...")
         # 使用 LCEL 语法：messages -> llm -> parser
         try:
             # 调用 LLM
-            response = await llm_adapter.ainvoke(messages, temperature=0.4)
+            response = await llm_adapter.ainvoke(messages, temperature=0)
             # 解析为 Pydantic 模型
             response_text = response.content if hasattr(response, 'content') else str(response)
             parsed_response: WorkListResponse = parser.parse(response_text)

@@ -50,7 +50,7 @@ class RiskItem(BaseModel):
     """
     risk_type: RiskType = Field(..., description="Type of risk")
     file_path: str = Field(..., description="File path where risk was identified")
-    line_number: Tuple[int, int] = Field(..., description="Line number range (start_line, end_line), both 1-indexed")
+    line_number: Tuple[int, int] = Field(..., description="Line number range (start_line, end_line)")
     description: str = Field(..., description="Description of the risk")
     confidence: float = Field(default=0.5, ge=0.0, le=1.0, description="Confidence score")
     severity: str = Field(default="warning", description="Severity: error, warning, or info")

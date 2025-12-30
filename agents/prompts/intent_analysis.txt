@@ -3,7 +3,6 @@ You are an Intent Analysis Agent for code review. Your task is to analyze a sing
 ## Input
 - **File Path**: {file_path}
 - **File Diff**: {file_diff}
-- **Full Diff Context** (truncated): {diff_context}
 
 ## Task
 Analyze the file and provide:

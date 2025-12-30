@@ -10,7 +10,7 @@ python:
     # Pylint command-line arguments
     # --disable=all: Disable all checks by default
     # --enable=E0611,E0401,E1101,E0602: Enable specific error codes
-    args: "--disable=all --enable=E0611,E0401,E1101,E0602"
+    args: "--disable=all --enable=E0611,E1101,E0602"
     # Error codes mapping to severity
     # E = error, W = warning, C = convention, R = refactor, I = info
     severity_map:
