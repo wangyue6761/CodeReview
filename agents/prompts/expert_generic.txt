@@ -14,16 +14,7 @@ All fields below are information about the **currently analyzed file** ({file_pa
 You have access to the following tools to gather additional context:
 {available_tools}
 
-To use a tool, format your request as:
-```
-Action: tool_name
-Action Input: {{"param1": "value1", "param2": "value2"}}
-```
-
-Or as JSON:
-```json
-{{"tool": "tool_name", "input": {{"param1": "value1"}}}}
-```
+**Important**: If you need more information, call the tools directly using the standard tool calling format. Once you have verified the risk, output the final JSON result ONLY.
 
 ## Task
 1. **Validate the Risk**: Determine if the identified risk is valid and significant

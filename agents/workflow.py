@@ -17,9 +17,6 @@ from core.state import ReviewState
 from core.llm import LLMProvider
 from core.langchain_llm import LangChainLLMAdapter
 from core.config import Config
-from tools.repo_tools import FetchRepoMapTool
-from tools.file_tools import ReadFileTool
-from tools.grep_tool import GrepTool
 from tools.langchain_tools import create_tools_with_context
 from agents.nodes.intent_analysis import intent_analysis_node
 from agents.nodes.manager import manager_node
@@ -48,11 +45,6 @@ def create_multi_agent_workflow(
     
     workspace_root = config.system.workspace_root
     asset_key = config.system.asset_key
-    tools = [
-        # FetchRepoMapTool(asset_key=asset_key),
-        ReadFileTool(workspace_root=workspace_root),
-        GrepTool(workspace_root=workspace_root)
-    ]
     
     langchain_tools = create_tools_with_context(
         workspace_root=workspace_root,
@@ -106,7 +98,6 @@ def create_multi_agent_workflow(
         llm_provider, 
         llm_adapter,
         config, 
-        tools,
         langchain_tools
     )
 
@@ -140,7 +131,6 @@ def _wrap_workflow_with_dependencies(
     llm_provider: LLMProvider,
     llm_adapter: LangChainLLMAdapter,
     config: Config,
-    tools: List[Any],
     langchain_tools: List[Any]
 ) -> Any:
     """包装工作流节点以注入依赖（LLM、配置、工具）。
@@ -162,7 +152,6 @@ def _wrap_workflow_with_dependencies(
         state["metadata"]["llm_provider"] = llm_provider
         state["metadata"]["llm_adapter"] = llm_adapter
         state["metadata"]["config"] = config
-        state["metadata"]["tools"] = tools
         state["metadata"]["langchain_tools"] = langchain_tools
         
         # Call original invoke
@@ -179,7 +168,6 @@ def _wrap_workflow_with_dependencies(
         state["metadata"]["llm_provider"] = llm_provider
         state["metadata"]["llm_adapter"] = llm_adapter
         state["metadata"]["config"] = config
-        state["metadata"]["tools"] = tools
         state["metadata"]["langchain_tools"] = langchain_tools
         
         # Call original invoke

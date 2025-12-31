@@ -6,7 +6,7 @@
 from typing import TypedDict, List, Dict, Any, Optional, Annotated, Literal, Tuple
 from enum import Enum
 from pydantic import BaseModel, Field, field_validator
-from langchain_core.messages import BaseMessage
+from langchain_core.messages import BaseMessage, AnyMessage
 from langgraph.graph.message import add_messages
 import operator
 
@@ -112,4 +112,19 @@ class ReviewState(TypedDict, total=False):
     repo_map_summary: str
     lint_errors: List[Dict[str, Any]]
     metadata: Optional[Dict[str, Any]]
+
+
+class ExpertState(TypedDict):
+    """专家子图状态。
+    
+    用于 LangGraph 专家分析子图的状态管理。
+    
+    Attributes:
+        messages: 消息历史（LangGraph 标准）。
+        risk_context: 待分析的风险项（输入）。
+        final_result: 最终验证结果（输出，JSON 字典）。
+    """
+    messages: Annotated[List[AnyMessage], add_messages]
+    risk_context: RiskItem  # 输入：待分析的风险项
+    final_result: Optional[dict]  # 输出：最终验证结果(JSON)
 

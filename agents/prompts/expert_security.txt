@@ -18,16 +18,7 @@
 你可以使用以下工具来获取更多上下文信息：
 {available_tools}
 
-使用工具时，请按以下格式提交请求:
-```
-Action: tool_name
-Action Input: {{"param1": "value1", "param2": "value2"}}
-```
-
-或者以 JSON 格式:
-```json
-{{"tool": "tool_name", "input": {{"param1": "value1"}}}}
-```
+**重要提示**：如果需要更多信息，请直接调用工具（使用标准的工具调用格式）。验证完风险后，请仅输出最终的 JSON 结果。
 
 ## Task
 1. **假设-验证过程**：先假设 RiskSpotter 的警告成立，再通过工具寻找反证（如输入验证、权限检查、参数化查询）。若无反证，则判定为真。
