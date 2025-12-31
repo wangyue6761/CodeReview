@@ -16,6 +16,7 @@ from langchain_core.output_parsers import PydanticOutputParser
 from core.state import ReviewState, RiskItem, RiskType, WorkListResponse
 from core.langchain_llm import LangChainLLMAdapter
 from agents.prompts import render_prompt_template
+from collections import defaultdict
 
 logger = logging.getLogger(__name__)
 
@@ -64,43 +65,30 @@ async def manager_node(state: ReviewState) -> Dict[str, Any]:
     print(f"  📥 接收文件分析: {len(file_analyses)} 个")
     
     try:
-        # Prepare file analyses summary for prompt
-        analyses_summary = _format_file_analyses(file_analyses)
-        
-        # 渲染提示模板（已经完成变量替换）
-        rendered_prompt = render_prompt_template(
-            "manager",
-            file_analyses_summary=analyses_summary,
-            num_files=len(file_analyses)
-        )
-        
-        # 重构说明：使用 PydanticOutputParser 解析结构化输出
-        # 这是 LangGraph 标准做法，替代手动 JSON 解析
-        parser = PydanticOutputParser(pydantic_object=WorkListResponse)
-        
-        # 创建消息列表（直接使用已渲染的文本，避免 ChatPromptTemplate 解析 JSON 示例）
-        messages = [
-            SystemMessage(content="You are a Manager Agent for code review. Generate a work list of tasks for expert agents."),
-            HumanMessage(content=rendered_prompt + "\n\n" + parser.get_format_instructions())
-        ]
-        
-        print("  🤖 调用 LLM 生成工作列表...")
-        # 使用 LCEL 语法：messages -> llm -> parser
-        try:
-            # 调用 LLM
-            response = await llm_adapter.ainvoke(messages, temperature=0)
-            # 解析为 Pydantic 模型
-            response_text = response.content if hasattr(response, 'content') else str(response)
-            parsed_response: WorkListResponse = parser.parse(response_text)
-            work_list = parsed_response.work_list
-        except Exception as e:
-            # 如果解析失败，回退到从 file_analyses 提取风险
-            logger.error(f"Failed to parse manager response with PydanticOutputParser: {e}")
-            logger.warning("Falling back to extracting risks from file_analyses")
-            work_list = []
-            for analysis in file_analyses:
-                work_list.extend(analysis.potential_risks)
-        
+        work_list = []
+        grouped = defaultdict(list)
+        for file_analyse in file_analyses:
+            for w in file_analyse.potential_risks:
+                key = (w.file_path, w.risk_type, w.line_number)
+                grouped[key].append(w)
+
+        for key, works in grouped.items():
+            file_path, risk_type, line_number = key
+            descriptions = [w.description for w in works]
+            merged_description = "\n".join(descriptions)
+            confidence = sum(w.confidence for w in works) / len(works)
+
+            risk_item = RiskItem(
+                risk_type=risk_type,
+                file_path=file_path,
+                line_number=line_number,
+                description=merged_description,
+                confidence=confidence
+                # severity 和 suggestion 使用默认值
+            )
+            work_list.append(risk_item)
+
+
         # Convert lint_errors to RiskItems and add to work_list
         lint_errors = state.get("lint_errors", [])
         if lint_errors:
@@ -110,7 +98,12 @@ async def manager_node(state: ReviewState) -> Dict[str, Any]:
         
         # Group work_list by risk_type
         expert_tasks = _group_tasks_by_risk_type(work_list)
-        
+
+        print(f"  ✅ worklist ")
+        for w in work_list:
+            print(w.file_path, w.risk_type, w.line_number, w.confidence, w.description)
+
+
         print(f"  ✅ Manager 完成!")
         print(f"     - 生成任务数: {len(work_list)}")
         print(f"     - 专家组数量: {len(expert_tasks)}")
@@ -154,6 +147,25 @@ def _format_file_analyses(file_analyses: List[Any]) -> str:
         )
     return "\n".join(summaries)
 
+def _format_work_list(work_list: List[Any]) -> str:
+    """Format file analyses for prompt.
+
+    Args:
+        file_analyses: List of FileAnalysis objects.
+
+    Returns:
+        Formatted string summary.
+    """
+    summaries = []
+    for w in work_list:
+        summaries.append(
+            f"File: {w.file_path}\n"
+            f"Line Number: {w.line_number}\n"
+            f"Confidence: {w.confidence}\n"
+            f"Risk Type: {w.risk_type}\n"
+            f"Description: {w.description}\n"
+        )
+    return "\n".join(summaries)
 
 # 重构说明：_parse_manager_response 函数已被移除
 # 现在使用 PydanticOutputParser 直接解析为 WorkListResponse 模型

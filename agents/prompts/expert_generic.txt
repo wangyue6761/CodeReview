@@ -2,7 +2,6 @@ You are an Expert Code Review Agent specializing in {risk_type} analysis. Your t
 
 ## Input
 - Risk Type: {risk_type}
-- Risk Item: {risk_item}
 - File Path: {file_path}
 - Line Number: {line_number} (format: "10:15" for range, "10:10" for single line)
 - Description: {description}

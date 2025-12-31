@@ -249,7 +249,7 @@ async def _process_risk_item(
     # Initialize expert analysis log entry
     expert_analysis = {
         "risk_type": risk_type_str,
-        "risk_item": risk_item.model_dump(),
+        # "risk_item": risk_item.model_dump(),
         "file_path": risk_item.file_path,
         "line_number": risk_item.line_number,
         "conversation_turns": [],
@@ -270,7 +270,7 @@ async def _process_risk_item(
             initial_prompt = render_prompt_template(
                 f"expert_{risk_type_str}",
                 risk_type=risk_type_str,
-                risk_item=risk_item.model_dump(),
+                # risk_item=risk_item.model_dump(),
                 file_path=risk_item.file_path,
                 line_number=line_number_str,  # Format as string for prompt display
                 description=risk_item.description,
@@ -283,7 +283,7 @@ async def _process_risk_item(
             initial_prompt = render_prompt_template(
                 "expert_generic",
                 risk_type=risk_type_str,
-                risk_item=risk_item.model_dump(),
+                # risk_item=risk_item.model_dump(),
                 file_path=risk_item.file_path,
                 line_number=line_number_str,  # Format as string for prompt display
                 description=risk_item.description,
@@ -438,7 +438,15 @@ async def _process_risk_item(
         if "expert_analyses" not in global_state["metadata"]:
             global_state["metadata"]["expert_analyses"] = []
         global_state["metadata"]["expert_analyses"].append(expert_analysis)
-        
+
+        print('\n最终结果')
+        print(validated_item.risk_type,validated_item.file_path,validated_item.line_number,validated_item.confidence)
+        print(validated_item.description)
+        print('\n历史过程')
+        for i,conv in enumerate(conversation_history):
+            print(i, conv['response'])
+        print('\n分析过程')
+        print(expert_analysis['final_response'])
         return validated_item
     except Exception as e:
         logger.error(f"Error processing risk item: {e}")

@@ -8,6 +8,17 @@ This script demonstrates the complete workflow:
 5. Display review results
 """
 
+# python main.py --repo C:\Users\dell\sentry-cursor --base master --head performance-enhancement-complete
+# python main.py --repo C:\Users\dell\sentry-cursor --base performance-optimization-baseline --head performance-enhancement-complete
+# python main.py --repo C:\Users\dell\sentry-cursor --base master --head error-upsampling-race-condition
+# python main.py --repo C:\Users\dell\sentry-cursor --base oauth-state-vulnerable --head oauth-state-secure
+# python main.py --repo C:\Users\dell\sentry-cursor --base replays-delete-vulnerable --head replays-delete-stable
+# python main.py --repo C:\Users\dell\sentry-cursor --base span-flusher-stable --head span-flusher-multiprocess
+# python main.py --repo E:\repo\grafana-cursor --base enhance-anonymous-access --head implement-device-limits
+# python main.py --repo E:\repo\grafana-cursor --base cache-optimization-baseline --head authz-service-improve-caching-pr
+# python main.py --repo E:\repo\grafana-cursor --base main --head plugins/rename-instrumentation-middleware-to-metrics-middleware
+
+
 import asyncio
 import argparse
 import json

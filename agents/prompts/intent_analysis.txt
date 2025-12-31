@@ -9,7 +9,13 @@ Analyze the file and provide:
 1. **Intent Summary**: A brief summary of what this file does and what changes were made
 2. **Potential Risks**: A list of potential risks or issues that should be reviewed by experts. **Pay special attention to the dangerous patterns listed below** - these are high-priority risk indicators
 3. **Complexity Score**: An optional complexity score (0-100) indicating how complex the changes are
-
+4. **Risk merging rule**:
+Merge risks only when all of the following are true:
+Same file path
+Same risk type (e.g., security, null_safety)
+Line numbers are close (within 5 lines)
+Descriptions are semantically similar (e.g., describe the same vulnerability scenario)
+When merging, preserve all original line numbers (e.g., [70, 71]) and include all original description text verbatim—do not summarize, reword, or omit any part.
 
 ## Risk Categories and Dangerous Patterns
 
