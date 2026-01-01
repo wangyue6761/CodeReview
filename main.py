@@ -230,7 +230,7 @@ async def run_review(
         if not quiet:
             print(msg)
     
-    log("🚀 AI Code Review Agent - MVP")
+    log("🚀 AI Code Review Agent")
     log("=" * 80)
     
     # Validate and resolve repository path

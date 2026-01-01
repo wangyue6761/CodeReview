@@ -6,6 +6,7 @@
             "type": "debugpy",
             "request": "launch",
             "program": "${workspaceFolder}/main.py",
+            "cwd": "${workspaceFolder}",
             "args": [
                 "--repo",
                 "/Users/wangyue/Code/CodeReviewData/ReviewDataset/grafana-greptile",
@@ -18,13 +19,17 @@
             "justMyCode": false,
             "env": {
                 "PYTHONPATH": "${workspaceFolder}"
-            }
+            },
+            "stopOnEntry": false,
+            "showReturnValue": true,
+            "gevent": false
         },
         {
             "name": "Python: Code Review (Git Mode - Custom)",
             "type": "debugpy",
             "request": "launch",
             "program": "${workspaceFolder}/main.py",
+            "cwd": "${workspaceFolder}",
             "args": [
                 "--repo",
                 "${input:repoPath}",
@@ -37,41 +42,10 @@
             "justMyCode": false,
             "env": {
                 "PYTHONPATH": "${workspaceFolder}"
-            }
-        },
-        {
-            "name": "Python: Code Review (Diff File Mode)",
-            "type": "debugpy",
-            "request": "launch",
-            "program": "${workspaceFolder}/main.py",
-            "args": [
-                "--repo",
-                "${input:repoPath}",
-                "--diff",
-                "${input:diffFile}"
-            ],
-            "console": "integratedTerminal",
-            "justMyCode": false,
-            "env": {
-                "PYTHONPATH": "${workspaceFolder}"
-            }
-        },
-        {
-            "name": "Python: Code Review (Test Repo - Diff File)",
-            "type": "debugpy",
-            "request": "launch",
-            "program": "${workspaceFolder}/main.py",
-            "args": [
-                "--repo",
-                "/Users/wangyue/Code/CodeReviewData/ReviewDataset/sentry-greptile",
-                "--diff",
-                "${input:diffFilePath}"
-            ],
-            "console": "integratedTerminal",
-            "justMyCode": false,
-            "env": {
-                "PYTHONPATH": "${workspaceFolder}"
-            }
+            },
+            "stopOnEntry": false,
+            "showReturnValue": true,
+            "gevent": false
         }
     ],
     "inputs": [
@@ -92,18 +66,6 @@
             "type": "promptString",
             "description": "Enter head branch or commit",
             "default": "HEAD"
-        },
-        {
-            "id": "diffFile",
-            "type": "promptString",
-            "description": "Enter path to diff file",
-            "default": "./sample.diff"
-        },
-        {
-            "id": "diffFilePath",
-            "type": "promptString",
-            "description": "Enter path to diff file (relative to repo or absolute)",
-            "default": "./changes.diff"
         }
     ]
 }
