@@ -31,7 +31,7 @@ from util import (
     ensure_head_version,
 )
 from util.pr_utils import make_results_serializable
-from util.git_utils import extract_files_from_diff, get_changed_files
+from util.git_utils import extract_files_from_diff, get_changed_files, get_git_diff
 
 
 
@@ -39,14 +39,16 @@ from util.git_utils import extract_files_from_diff, get_changed_files
 async def run_syntax_checking(
     repo_path: Path,
     pr_diff: str,
-    args: argparse.Namespace
+    base_branch: str,
+    head_branch: str
 ) -> List[dict]:
     """对变更文件执行语法/静态检查。
     
     Args:
         repo_path: 仓库根路径。
         pr_diff: Git diff 内容。
-        args: 命令行参数。
+        base_branch: base分支。
+        head_branch: head分支。
     
     Returns:
         检查错误列表，每个错误包含：file, line, message, severity, code。
@@ -54,7 +56,7 @@ async def run_syntax_checking(
     try:
         # Get changed files from Git
         try:
-            changed_files = get_changed_files(repo_path, args.base, args.head)
+            changed_files = get_changed_files(repo_path, base_branch, head_branch)
         except Exception as e:
             print(f"  ⚠️  Warning: Could not get changed files from Git: {e}")
             # Fallback: try to extract from diff
@@ -204,94 +206,132 @@ def parse_arguments() -> argparse.Namespace:
     return parser.parse_args()
 
 
-async def main():
-    """代码审查系统主入口。"""
-    args = parse_arguments()
+async def run_review(
+    repo_path: Path,
+    base_branch: str,
+    head_branch: str,
+    output_file: Path,
+    quiet: bool = False
+) -> int:
+    """代码审查核心逻辑，可被导入调用。
     
-    print("🚀 AI Code Review Agent - MVP")
-    print("=" * 80)
+    Args:
+        repo_path: 仓库路径
+        base_branch: base分支
+        head_branch: head分支
+        output_file: 输出文件路径
+        quiet: 是否静默模式（减少输出）
+    
+    Returns:
+        退出码：0表示成功，1表示失败
+    """
+    def log(msg: str = ""):
+        """条件输出函数"""
+        if not quiet:
+            print(msg)
+    
+    log("🚀 AI Code Review Agent - MVP")
+    log("=" * 80)
     
     # Validate and resolve repository path
-    repo_path = validate_repo_path(Path(args.repo))
-    print(f"📁 Repository: {repo_path}")
+    repo_path = validate_repo_path(repo_path)
+    log(f"📁 Repository: {repo_path}")
     
     # Load configuration and set workspace root to repo path
     config = Config.load_default()
     config.system.workspace_root = repo_path
     
-    print(f"📝 Configuration loaded: LLM Provider = {config.llm.provider}")
-    print(f"📁 Workspace root: {config.system.workspace_root}")
+    log(f"📝 Configuration loaded: LLM Provider = {config.llm.provider}")
+    log(f"📁 Workspace root: {config.system.workspace_root}")
     
-    # Load diff from Git (includes argument validation)
-    pr_diff, branch, commit = load_diff_from_args(args, repo_path)
+    # Load diff from Git
+    log(f"\n🔀 Getting Git diff: {base_branch}...{head_branch}")
+    try:
+        pr_diff = get_git_diff(repo_path, base_branch, head_branch)
+        if not pr_diff or len(pr_diff.strip()) == 0:
+            log(f"⚠️  Warning: Git diff is empty. No changes found between {base_branch} and {head_branch}")
+        else:
+            log(f"✅ Git diff retrieved ({len(pr_diff)} characters)")
+    except Exception as e:
+        log(f"❌ Error getting Git diff: {e}")
+        return 1
+    
+    # Get Git info from head branch for asset key generation
+    branch, commit = get_git_info(repo_path, head_branch)
+    
+    if not pr_diff:
+        log("❌ Error: No diff content available")
+        return 1
+    
+    log(f"📝 Processing Git diff ({len(pr_diff)} characters)...")
     
     # Ensure repository is on HEAD version (not base version) before review
     try:
-        print(f"\n🔀 Ensuring repository is on HEAD version ({args.head})...")
-        ensure_head_version(repo_path, args.head)
-        print(f"✅ Repository is on HEAD version")
+        log(f"\n🔀 Ensuring repository is on HEAD version ({head_branch})...")
+        ensure_head_version(repo_path, head_branch)
+        log(f"✅ Repository is on HEAD version")
     except Exception as e:
-        print(f"⚠️  Warning: Could not ensure HEAD version: {e}")
-        print(f"   Continuing with current version...")
+        log(f"⚠️  Warning: Could not ensure HEAD version: {e}")
+        log(f"   Continuing with current version...")
 
     # Step 1: Initialize Storage (DAO layer)
-    print("\n💾 Initializing storage backend...")
+    log("\n💾 Initializing storage backend...")
     storage = get_storage()
     await storage.connect()
-    print("✅ Storage initialized")
+    log("✅ Storage initialized")
     
     # Step 2: Build Assets if needed
-    print("\n📦 Checking assets...")
-    # Git info already retrieved in load_diff_from_args
+    log("\n📦 Checking assets...")
     asset_key = await build_repo_map_if_needed(repo_path, branch=branch, commit=commit)
     
     # Store asset_key in config for tools to use
     config.system.asset_key = asset_key
     
     # Step 2.5: Run Pre-Agent Syntax/Lint Checking
-    print("\n🔍 Running pre-agent syntax/lint checking...")
+    log("\n🔍 Running pre-agent syntax/lint checking...")
     lint_errors = await run_syntax_checking(
         repo_path=repo_path,
         pr_diff=pr_diff,
-        args=args
+        base_branch=base_branch,
+        head_branch=head_branch
     )
     
     if lint_errors:
-        print(f"  ⚠️  Found {len(lint_errors)} linting error(s):")
+        log(f"  ⚠️  Found {len(lint_errors)} linting error(s):")
         for error in lint_errors[:10]:  # Show first 10
             file_path = error.get("file", "unknown")
             line = error.get("line", 0)
             message = error.get("message", "")
             severity = error.get("severity", "error")
             icon = {"error": "❌", "warning": "⚠️", "info": "ℹ️"}.get(severity, "•")
-            print(f"    {icon} {file_path}:{line} - {message}")
+            log(f"    {icon} {file_path}:{line} - {message}")
         if len(lint_errors) > 10:
-            print(f"    ... and {len(lint_errors) - 10} more")
+            log(f"    ... and {len(lint_errors) - 10} more")
     else:
-        print("  ✅ No linting errors found")
+        log("  ✅ No linting errors found")
     
     # Step 3 & 4: Initialize and Run Multi-Agent Workflow
-    print("\n🤖 Initializing multi-agent workflow...")
-    print("  → Workflow will:")
-    print("    1. Analyze file intents in parallel")
-    print("    2. Manager routes tasks to expert agents")
-    print("    3. Expert agents validate risks with concurrency control")
-    print("    4. Generate final review report")
+    log("\n🤖 Initializing multi-agent workflow...")
+    log("  → Workflow will:")
+    log("    1. Analyze file intents in parallel")
+    log("    2. Manager routes tasks to expert agents")
+    log("    3. Expert agents validate risks with concurrency control")
+    log("    4. Generate final review report")
     
     # Get changed files list for the workflow
     try:
-        changed_files = get_changed_files(repo_path, args.base, args.head)
+        changed_files = get_changed_files(repo_path, base_branch, head_branch)
     except Exception as e:
-        print(f"  ⚠️  Warning: Could not get changed files from Git: {e}")
+        log(f"  ⚠️  Warning: Could not get changed files from Git: {e}")
         # Fallback: try to extract from diff
         try:
             changed_files = extract_files_from_diff(pr_diff)
         except Exception as e2:
-            print(f"  ⚠️  Warning: Could not extract changed files from diff: {e2}")
+            log(f"  ⚠️  Warning: Could not extract changed files from diff: {e2}")
             changed_files = []
     
     if not changed_files:
-        print("  ⚠️  Warning: No changed files detected, workflow may not produce results")
+        log("  ⚠️  Warning: No changed files detected, workflow may not produce results")
     
     try:
         results = await run_multi_agent_workflow(
@@ -302,25 +342,39 @@ async def main():
         )
         
         # Print results
-        print_review_results(results, workspace_root=repo_path, config=config)
+        if not quiet:
+            print_review_results(results, workspace_root=repo_path, config=config)
         
         # Save results to file (clean non-serializable objects from metadata)
-        output_file = Path(args.output)
+        output_file = Path(output_file)
         
         # Create a serializable copy of results
         serializable_results = make_results_serializable(results)
         
         with open(output_file, "w", encoding="utf-8") as f:
             json.dump(serializable_results, f, indent=2, ensure_ascii=False)
-        print(f"\n💾 Results saved to: {output_file}")
+        log(f"\n💾 Results saved to: {output_file}")
         
     except Exception as e:
-        print(f"\n❌ Error running agent: {e}")
+        log(f"\n❌ Error running agent: {e}")
         import traceback
         traceback.print_exc()
         return 1
     
     return 0
+
+
+async def main():
+    """代码审查系统主入口（命令行模式）。"""
+    args = parse_arguments()
+    
+    return await run_review(
+        repo_path=Path(args.repo),
+        base_branch=args.base,
+        head_branch=args.head,
+        output_file=Path(args.output),
+        quiet=False
+    )
 
 
 if __name__ == "__main__":

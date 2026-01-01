@@ -1,0 +1,1 @@
+python test/run_automated_tests.py --datasets-dir ~/Code/CodeReviewData/ReviewDataset --repos sentry --cases 1-5

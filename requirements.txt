@@ -3,7 +3,8 @@
 # Core dependencies
 pydantic>=2.0.0
 langgraph>=0.0.40
-langchain-core>=0.1.0  # For PromptTemplate, ChatPromptTemplate, tools, messages
+langchain-core>=0.1.0 
+openai>=1.0.0 # For PromptTemplate, ChatPromptTemplate, tools, messages
 
 # Optional: For OpenAI or DeepSeek provider (if not using mock)
 # DeepSeek uses OpenAI-compatible API, so same package works for both

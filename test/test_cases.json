@@ -1,0 +1,312 @@
+{
+  "sentry": {
+    "1 Enhanced Pagination Performance for High-Volume Audit Logs_Importing non-existent OptimizedCursorPaginator": {
+      "repo_name": "sentry-greptile",
+      "prlink": "https://github.com/ai-code-review-evaluation/sentry-greptile/pull/1",
+      "base_branch": "master",
+      "head_branch": "performance-enhancement-complete"
+    },
+    "2 Optimize spans buffer insertion with eviction during insert_Negative offset cursor manipulation bypasses pagination boundaries": {
+      "repo_name": "sentry-greptile",
+      "prlink": "https://github.com/ai-code-review-evaluation/sentry-cursor/pull/2",
+      "base_branch": "performance-optimization-baseline",
+      "head_branch": "performance-enhancement-complete"
+    },
+    "3 Support upsampled error count with performance optimizations_sample_rate = 0.0 is falsy and skipped": {
+      "repo_name": "sentry-greptile",
+      "prlink": "https://github.com/ai-code-review-evaluation/sentry-greptile/pull/3",
+      "base_branch": "master",
+      "head_branch": "error-upsampling-race-condition"
+    },
+    "4 GitHub OAuth Security Enhancement_Null reference if github_authenticated_user state is missing": {
+      "repo_name": "sentry-greptile",
+      "prlink": "https://github.com/ai-code-review-evaluation/sentry-cursor/pull/4",
+      "base_branch": "oauth-state-vulnerable",
+      "head_branch": "oauth-state-secure"
+    },
+    "5 Replays Self-Serve Bulk Delete System_Breaking changes in error response format": {
+      "repo_name": "sentry-greptile",
+      "prlink": "https://github.com/ai-code-review-evaluation/sentry-greptile/pull/5",
+      "base_branch": "replays-delete-vulnerable",
+      "head_branch": "replays-delete-stable"
+    },
+    "6 Span Buffer Multiprocess Enhancement with Health Monitoring_Inconsistent metric tagging with 'shard' and 'shards'": {
+      "repo_name": "sentry-greptile",
+      "prlink": "https://github.com/ai-code-review-evaluation/sentry-greptile/pull/6",
+      "base_branch": "span-flusher-stable",
+      "head_branch": "span-flusher-multiprocess"
+    },
+    "7 Implement cross-system issue synchronization_Shared mutable default in dataclass timestamp": {
+      "repo_name": "sentry-greptile",
+      "prlink": "https://github.com/ai-code-review-evaluation/sentry-cursor/pull/7",
+      "base_branch": "ecosystem-sync-integration-before",
+      "head_branch": "ecosystem-sync-integration-after"
+    },
+    "8 Reorganize incident creation / issue occurrence logic_Using stale config variable instead of updated one": {
+      "repo_name": "sentry-greptile",
+      "prlink": "https://github.com/ai-code-review-evaluation/sentry-greptile/pull/8",
+      "base_branch": "monitor-incident-refactor-before",
+      "head_branch": "monitor-incident-refactor-after"
+    },
+    "9 Add ability to use queues to manage parallelism_Invalid queue.ShutDown exception handling": {
+      "repo_name": "sentry-greptile",
+      "prlink": "https://github.com/ai-code-review-evaluation/sentry-greptile/pull/9",
+      "base_branch": "kafka-consumer-parallel-before",
+      "head_branch": "kafka-consumer-parallel-after"
+    },
+    "Add hook for producing occurrences from the stateful detector_Incomplete implementation (only contains pass)": {
+      "repo_name": "sentry-greptile",
+      "prlink": "https://github.com/ai-code-review-evaluation/sentry-cursor/pull/10",
+      "base_branch": "workflow-engine-stateful-detector-before",
+      "head_branch": "workflow-engine-stateful-detector-after"
+    }
+  },
+  "cal.com": {
+    "Async import of the appStore packages_Async callbacks in forEach creates unhandled promise rejections": {
+      "repo_name": "cal.com-greptile",
+      "prlink": "https://github.com/ai-code-review-evaluation/cal.com-cursor/pull/2",
+      "base_branch": "appstore-sync-refactor-base",
+      "head_branch": "appstore-async-improvements"
+    },
+    "feat: 2fa backup codes_Backup codes not invalidated after use": {
+      "repo_name": "cal.com-greptile",
+      "prlink": "https://github.com/ai-code-review-evaluation/cal.com-coderabbit/pull/3",
+      "base_branch": "enhance-two-factor-security-foundation",
+      "head_branch": "improve-two-factor-authentication-features"
+    },
+    "fix: handle collective multiple host on destinationCalendar_Null reference error if array is empty": {
+      "repo_name": "cal.com-greptile",
+      "prlink": "https://github.com/ai-code-review-evaluation/cal.com-cursor/pull/4",
+      "base_branch": "enhance-collective-scheduling-foundation",
+      "head_branch": "fix/handle-collective-multiple-host-destinations"
+    },
+    "feat: convert InsightsBookingService to use Prisma.sql raw queries_Potential SQL injection risk in raw SQL query construction": {
+      "repo_name": "cal.com-greptile",
+      "prlink": "https://github.com/ai-code-review-evaluation/cal.com-greptile/pull/5",
+      "base_branch": "insights-query-foundation",
+      "head_branch": "insights-performance-optimization"
+    },
+    "Comprehensive workflow reminder management for booking lifecycle events_Missing database cleanup when immediateDelete is true": {
+      "repo_name": "cal.com-greptile",
+      "prlink": "https://github.com/ai-code-review-evaluation/cal.com-cursor/pull/6",
+      "base_branch": "workflow-queue-base",
+      "head_branch": "workflow-queue-enhanced"
+    },
+    "Advanced date override handling and timezone compatibility improvements_Incorrect end time calculation using slotStartTime instead of slotEndTime": {
+      "repo_name": "cal.com-greptile",
+      "prlink": "https://github.com/ai-code-review-evaluation/cal.com-greptile/pull/7",
+      "base_branch": "date-algorithm-base",
+      "head_branch": "date-algorithm-enhanced"
+    },
+    "OAuth credential sync and app integration enhancements_Timing attack vulnerability using direct string comparison": {
+      "repo_name": "cal.com-greptile",
+      "prlink": "https://github.com/ai-code-review-evaluation/cal.com-greptile/pull/8",
+      "base_branch": "oauth-security-base",
+      "head_branch": "oauth-security-enhanced"
+    },
+    "SMS workflow reminder retry count tracking_OR condition causes deletion of all workflow reminders": {
+      "repo_name": "cal.com-greptile",
+      "prlink": "https://github.com/ai-code-review-evaluation/cal.com-cursor/pull/9",
+      "base_branch": "sms-retry-base",
+      "head_branch": "sms-retry-enhanced"
+    },
+    "Add guest management functionality to existing bookings_Case sensitivity bypass in email blacklist": {
+      "repo_name": "cal.com-greptile",
+      "prlink": "https://github.com/ai-code-review-evaluation/cal.com-greptile/pull/10",
+      "base_branch": "guest-management-base",
+      "head_branch": "guest-management-enhanced"
+    },
+    "feat: add calendar cache status and actions (#22532)_Inaccurate cache status tracking due to unreliable updatedAt field": {
+      "repo_name": "cal.com-greptile",
+      "prlink": "https://github.com/ai-code-review-evaluation/cal.com-cursor/pull/11",
+      "base_branch": "calendar-cache-foundation",
+      "head_branch": "introduce-cache-key-overflow"
+    }
+  },
+  "discourse": {
+    "FEATURE: automatically downsize large images_Method overwriting causing parameter mismatch": {
+      "repo_name": "discourse-greptile",
+      "prlink": "https://github.com/ai-code-review-evaluation/discourse-cursor/pull/1",
+      "base_branch": "image-processing-optimization",
+      "head_branch": "large-image-processing"
+    },
+    "FEATURE: per-topic unsubscribe option in emails_Nil reference non-existent TopicUser": {
+      "repo_name": "discourse-greptile",
+      "prlink": "https://github.com/ai-code-review-evaluation/discourse-cursor/pull/2",
+      "base_branch": "email-notifications-enhancement",
+      "head_branch": "topic-email-management"
+    },
+    "Add comprehensive email validation for blocked users_BlockedEmail.should_block? modifies DB during read": {
+      "repo_name": "discourse-greptile",
+      "prlink": "https://github.com/ai-code-review-evaluation/discourse-cursor/pull/3",
+      "base_branch": "blocked-email-validation-pre",
+      "head_branch": "blocked-email-validation-post"
+    },
+    "Enhance embed URL handling and validation system_SSRF vulnerability using open(url) without validation": {
+      "repo_name": "discourse-greptile",
+      "prlink": "https://github.com/ai-code-review-evaluation/discourse-cursor/pull/4",
+      "base_branch": "embed-url-handling-pre",
+      "head_branch": "embed-url-handling-post"
+    },
+    "Optimize header layout performance with flexbox mixins_Mixing float: left with flexbox causes layout issues": {
+      "repo_name": "discourse-greptile",
+      "prlink": "https://github.com/ai-code-review-evaluation/discourse-coderabbit/pull/5",
+      "base_branch": "header-layout-optimization-pre",
+      "head_branch": "header-layout-optimization-post"
+    },
+    "UX: show complete URL path if website domain is same as instance domain_String mutation with << operator": {
+      "repo_name": "discourse-greptile",
+      "prlink": "https://github.com/ai-code-review-evaluation/discourse-cursor/pull/6",
+      "base_branch": "url-handling-pre",
+      "head_branch": "url-handling-post"
+    },
+    "scale-color $lightness must use $secondary for dark themes_Inconsistent theme color lightness affects visibility": {
+      "repo_name": "discourse-greptile",
+      "prlink": "https://github.com/ai-code-review-evaluation/discourse-cursor/pull/7",
+      "base_branch": "theme-color-scheme-pre",
+      "head_branch": "theme-color-scheme-post"
+    },
+    "FIX: proper handling of group memberships_Race conditions in async member loading": {
+      "repo_name": "discourse-greptile",
+      "prlink": "https://github.com/ai-code-review-evaluation/discourse-greptile/pull/8",
+      "base_branch": "group-dm-user-addition-pre",
+      "head_branch": "group-dm-user-addition-post"
+    },
+    "FEATURE: Localization fallbacks (server-side)_Thread-safety issue with lazy @loaded_locales": {
+      "repo_name": "discourse-greptile",
+      "prlink": "https://github.com/ai-code-review-evaluation/discourse-greptile/pull/9",
+      "base_branch": "localization-system-pre",
+      "head_branch": "localization-system-post"
+    },
+    "FEATURE: Can edit category/host relationships for embedding_NoMethodError before_validation in EmbeddableHost": {
+      "repo_name": "discourse-greptile",
+      "prlink": "https://github.com/ai-code-review-evaluation/discourse-cursor/pull/10",
+      "base_branch": "rest-serializer-enhancement-pre",
+      "head_branch": "rest-serializer-enhancement-post"
+    }
+  },
+  "grafana": {
+    "Anonymous: Add configurable device limit_Race condition in CreateOrUpdateDevice method": {
+      "repo_name": "grafana-greptile",
+      "prlink": "https://github.com/ai-code-review-evaluation/grafana-greptile/pull/1",
+      "base_branch": "enhance-anonymous-access",
+      "head_branch": "implement-device-limits"
+    },
+    "AuthZService: improve authz caching_Cache entries without expiration causing permanent permission denials": {
+      "repo_name": "grafana-greptile",
+      "prlink": "https://github.com/ai-code-review-evaluation/grafana-cursor/pull/2",
+      "base_branch": "cache-optimization-baseline",
+      "head_branch": "authz-service-improve-caching-pr"
+    },
+    "Plugins: Chore: Renamed instrumentation middleware to metrics middleware_Undefined endpoint constants causing compilation errors": {
+      "repo_name": "grafana-greptile",
+      "prlink": "https://github.com/ai-code-review-evaluation/grafana-greptile/pull/3",
+      "base_branch": "main",
+      "head_branch": "plugins/rename-instrumentation-middleware-to-metrics-middleware"
+    },
+    "Advanced Query Processing Architecture_Double interpolation risk": {
+      "repo_name": "grafana-greptile",
+      "prlink": "https://github.com/ai-code-review-evaluation/grafana-cursor/pull/4",
+      "base_branch": "query-splitting-baseline",
+      "head_branch": "query-splitting-enhancements"
+    },
+    "Notification Rule Processing Engine_Missing key prop causing React rendering issues": {
+      "repo_name": "grafana-greptile",
+      "prlink": "https://github.com/ai-code-review-evaluation/grafana-cursor/pull/5",
+      "base_branch": "notification-rule-baseline",
+      "head_branch": "notification-rule-enhancements"
+    },
+    "Dual Storage Architecture_Incorrect metrics recording methods causing misleading performance tracking": {
+      "repo_name": "grafana-greptile",
+      "prlink": "https://github.com/ai-code-review-evaluation/grafana-cursor/pull/6",
+      "base_branch": "dual-storage-baseline",
+      "head_branch": "dual-storage-enhanced"
+    },
+    "Database Performance Optimizations_Incorrect error level logging": {
+      "repo_name": "grafana-greptile",
+      "prlink": "https://github.com/ai-code-review-evaluation/grafana-greptile/pull/7",
+      "base_branch": "db-cleanup-baseline",
+      "head_branch": "db-cleanup-optimized"
+    },
+    "Frontend Asset Optimization_Deadlock potential during concurrent annotation deletion operations": {
+      "repo_name": "grafana-greptile",
+      "prlink": "https://github.com/ai-code-review-evaluation/grafana-cursor/pull/8",
+      "base_branch": "asset-loading-baseline",
+      "head_branch": "asset-loading-optimized"
+    },
+    "Advanced SQL Analytics Framework_enableSqlExpressions function always returns false, disabling SQL functionality": {
+      "repo_name": "grafana-greptile",
+      "prlink": "https://github.com/ai-code-review-evaluation/grafana-cursor/pull/9",
+      "base_branch": "data-analysis-features",
+      "head_branch": "advanced-sql-analytics"
+    },
+    "Unified Storage Performance Optimizations_Race condition in cache locking": {
+      "repo_name": "grafana-greptile",
+      "prlink": "https://github.com/ai-code-review-evaluation/grafana-cursor/pull/10",
+      "base_branch": "performance-optimization-baseline",
+      "head_branch": "unified-storage-enhancements"
+    }
+  },
+  "keycloak": {
+    "Fixing Re-authentication with passkeys_ConditionalPasskeysEnabled() called without UserModel parameter": {
+      "repo_name": "keycloak-greptile",
+      "prlink": "https://github.com/ai-code-review-evaluation/keycloak-greptile/pull/1",
+      "base_branch": "improve-auth-user-experience",
+      "head_branch": "enhance-passkey-authentication-flow"
+    },
+    "Add caching support for IdentityProviderStorageProvider .getForLogin operations_Recursive caching call using session instead of delegate": {
+      "repo_name": "keycloak-greptile",
+      "prlink": "https://github.com/ai-code-review-evaluation/keycloak-greptile/pull/2",
+      "base_branch": "feature-idp-cache-baseline",
+      "head_branch": "feature-idp-cache-implementation"
+    },
+    "Add AuthzClientCryptoProvider for authorization client cryptographic operations_Returns wrong provider (default keystore instead of BouncyCastle)": {
+      "repo_name": "keycloak-greptile",
+      "prlink": "https://github.com/ai-code-review-evaluation/keycloak-greptile/pull/3",
+      "base_branch": "feature-authz-crypto-baseline",
+      "head_branch": "feature-authz-crypto-implementation"
+    },
+    "Add rolling-updates feature flag and compatibility framework_Incorrect method call for exit codes": {
+      "repo_name": "keycloak-greptile",
+      "prlink": "https://github.com/ai-code-review-evaluation/keycloak-cursor/pull/4",
+      "base_branch": "feature-rolling-updates-baseline",
+      "head_branch": "feature-rolling-updates-implementation"
+    },
+    "Add Client resource type and scopes to authorization schema_Inconsistent feature flag bug causing orphaned permissions": {
+      "repo_name": "keycloak-greptile",
+      "prlink": "https://github.com/ai-code-review-evaluation/keycloak-cursor/pull/5",
+      "base_branch": "feature-clients-authz-baseline",
+      "head_branch": "feature-clients-authz-implementation"
+    },
+    "Add Groups resource type and scopes to authorization schema_Incorrect permission check in canManage() method": {
+      "repo_name": "keycloak-greptile",
+      "prlink": "https://github.com/ai-code-review-evaluation/keycloak-cursor/pull/6",
+      "base_branch": "feature-groups-authz-baseline",
+      "head_branch": "feature-groups-authz-implementation"
+    },
+    "Add HTML sanitizer for translated message resources_Lithuanian translation files contain Italian text": {
+      "repo_name": "keycloak-greptile",
+      "prlink": "https://github.com/ai-code-review-evaluation/keycloak-cursor/pull/7",
+      "base_branch": "feature-html-sanitizer-baseline",
+      "head_branch": "feature-html-sanitizer-implementation"
+    },
+    "Implement access token context encoding framework_Wrong parameter in null check (grantType vs. rawTokenId)": {
+      "repo_name": "keycloak-greptile",
+      "prlink": "https://github.com/ai-code-review-evaluation/keycloak-cursor/pull/8",
+      "base_branch": "feature-token-context-baseline",
+      "head_branch": "feature-token-context-implementation"
+    },
+    "Implement recovery key support for user storage providers_Unsafe raw List deserialization without type safety": {
+      "repo_name": "keycloak-greptile",
+      "prlink": "https://github.com/ai-code-review-evaluation/keycloak-cursor/pull/9",
+      "base_branch": "feature-recovery-keys-foundation",
+      "head_branch": "feature-recovery-keys-implementation"
+    },
+    "Fix concurrent group access to prevent NullPointerException_Missing null check causing NullPointerException": {
+      "repo_name": "keycloak-greptile",
+      "prlink": "https://github.com/ai-code-review-evaluation/keycloak-cursor/pull/10",
+      "base_branch": "feature-group-concurrency-update",
+      "head_branch": "feature-group-concurrency-implementation"
+    }
+  }
+}
