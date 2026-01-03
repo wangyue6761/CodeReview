@@ -2,20 +2,42 @@
 # Copy this file to config.yaml and customize as needed
 
 llm:
-  provider: "deepseek"  # Options: "openai", "deepseek", "mock"
-  model: "deepseek-chat"  # Model name (e.g., "deepseek-chat", "gpt-4", "gpt-3.5-turbo")
-  api_key: null  # Optional: can be set via DEEPSEEK_API_KEY or LLM_API_KEY env var
-  base_url: "https://api.deepseek.com"  # DeepSeek API endpoint (default)
-  temperature: 0.7    # Temperature for LLM responses (0.0 - 2.0)
+  # 一键切换模型：修改 provider 字段即可
+  # - "deepseek" → 使用 DeepSeek (默认)
+  # - "zhipuai" → 使用 ZhipuAI (GLM-4)
+  # - "openai" → 使用 OpenAI
+  provider: "zhipuai"  # Options: "openai", "deepseek", "zhipuai"
+  
+  # 模型名称（根据 provider 自动选择默认值）
+  # DeepSeek: "deepseek-chat"
+  # ZhipuAI: "glm-4.6"
+  # OpenAI: "gpt-4", "gpt-3.5-turbo" 等
+  model: "glm-4.6"
+  
+  # API Key (可选，可通过环境变量设置)
+  # 环境变量优先级: LLM_API_KEY > provider-specific keys (DEEPSEEK_API_KEY, ZHIPUAI_API_KEY)
+  api_key: null
+  
+  # Base URL (仅用于 OpenAI 兼容的 API，如 DeepSeek)
+  # ZhipuAI 不需要此配置
+  base_url: "https://api.deepseek.com"
+  
+  # Temperature 参数 (0.0 - 2.0)
+  temperature: 0
 
-# Note: If DEEPSEEK_API_KEY is set in environment and provider is "deepseek",
-# the API key will be automatically loaded from the environment variable.
-# Priority: LLM_API_KEY > DEEPSEEK_API_KEY
+# 快速切换示例：
+# 切换到 ZhipuAI: 将 provider 改为 "zhipuai"，model 改为 "glm-4"
+# 切换到 OpenAI: 将 provider 改为 "openai"，model 改为 "gpt-4"
+#
+# 环境变量覆盖（最高优先级）：
+# export LLM_PROVIDER=zhipuai  # 覆盖配置文件中的 provider
+# export LLM_MODEL=glm-4       # 覆盖配置文件中的 model
+# export LLM_API_KEY=your-key  # 覆盖配置文件中的 api_key
 
 system:
   workspace_root: "."           # Root directory of the workspace
   assets_dir: "assets_cache"    # Directory for storing built assets
   timeout_seconds: 600           # Maximum time for analysis (10 minutes)
-  max_concurrent_llm_requests: 20
+  max_concurrent_llm_requests: 1
   max_expert_rounds: 22         # Maximum rounds for expert analysis (circuit breaker)
 

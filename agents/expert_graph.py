@@ -4,8 +4,9 @@
 
 import logging
 import os
+import json
 from typing import List, Optional, Any, Dict
-from langchain_core.messages import SystemMessage, HumanMessage, ToolMessage, BaseMessage
+from langchain_core.messages import SystemMessage, HumanMessage, ToolMessage, BaseMessage, AIMessage
 from langchain_core.output_parsers import PydanticOutputParser
 from langchain_core.language_models import BaseChatModel
 from langgraph.graph import StateGraph, END
@@ -17,6 +18,45 @@ from agents.prompts import render_prompt_template
 from util.json_utils import extract_json_from_text
 
 logger = logging.getLogger(__name__)
+
+def _log_http_error_details(err: Exception, *, max_body_chars: int = 4000) -> None:
+    """Best-effort logging for provider HTTP errors (e.g. httpx.HTTPStatusError)."""
+    try:
+        resp = getattr(err, "response", None)
+        req = getattr(err, "request", None)
+        if resp is None:
+            return
+
+        status = getattr(resp, "status_code", None)
+        url = None
+        try:
+            url = str(getattr(req, "url", None) or getattr(resp, "url", None))
+        except Exception:
+            url = None
+
+        body = ""
+        try:
+            body = getattr(resp, "text", "") or ""
+        except Exception:
+            body = ""
+
+        if isinstance(body, bytes):
+            body = body.decode("utf-8", errors="replace")
+        if not isinstance(body, str):
+            body = str(body)
+
+        body = body.strip()
+        if len(body) > max_body_chars:
+            body = body[:max_body_chars] + "\n...[truncated]..."
+
+        logger.error(f"LLM HTTP error details: status={status} url={url}")
+        if body:
+            logger.error(f"LLM HTTP error response body:\n{body}")
+        else:
+            logger.error("LLM HTTP error response body: <empty>")
+    except Exception:
+        # Never let diagnostics crash the workflow
+        return
 
 
 def create_langchain_tools(
@@ -118,6 +158,18 @@ def build_expert_graph(
             return s
         return s[:max_chars] + "\n...[truncated]..."
 
+    def _stringify_content(content: Any) -> str:
+        if content is None:
+            return ""
+        if isinstance(content, str):
+            return content
+        if isinstance(content, bytes):
+            return content.decode("utf-8", errors="replace")
+        try:
+            return json.dumps(content, ensure_ascii=False, default=str)
+        except Exception:
+            return str(content)
+
     def _copy_with_content(msg: BaseMessage, content: str) -> BaseMessage:
         # langchain_core messages are pydantic models (v1/v2 depending on version)
         if hasattr(msg, "model_copy"):
@@ -134,7 +186,12 @@ def build_expert_graph(
         return msg
 
     def _shrink_history(messages: List[BaseMessage]) -> List[BaseMessage]:
-        """Hard budget for LLM context: cap history length + truncate tool payloads."""
+        """Hard budget for LLM context: cap history length + truncate tool payloads.
+
+        Notes:
+        - Tool results can be very large; truncating them reduces context blowups.
+        - Some tool runners may attach non-string content; we stringify to keep request payloads valid.
+        """
         try:
             max_history = int(os.environ.get("EXPERT_MAX_HISTORY_MESSAGES", "16"))
         except Exception:
@@ -159,10 +216,14 @@ def build_expert_graph(
         clipped: List[BaseMessage] = []
         for m in tail:
             c = getattr(m, "content", "")
-            if isinstance(c, str) and isinstance(m, ToolMessage) and len(c) > max_tool_chars:
-                clipped.append(_copy_with_content(m, _truncate_text(c, max_tool_chars)))
-            else:
-                clipped.append(m)
+            if isinstance(m, ToolMessage):
+                # Ensure tool message content is string-serializable (provider adapters vary in strictness).
+                c_str = _stringify_content(c)
+                if len(c_str) > max_tool_chars:
+                    c_str = _truncate_text(c_str, max_tool_chars)
+                clipped.append(_copy_with_content(m, c_str))
+                continue
+            clipped.append(m)
 
         # 3) enforce total budget by dropping oldest remaining messages
         def total_chars(msgs: List[BaseMessage]) -> int:
@@ -179,6 +240,7 @@ def build_expert_graph(
     
     async def handle_circuit_breaker(
         messages: List[BaseMessage],
+        current_round: int,
         max_rounds: int,
         raw_llm: BaseChatModel,
         format_instructions: str,
@@ -196,8 +258,6 @@ def build_expert_graph(
         Returns:
             如果触发熔断，返回包含强制结束响应的状态；否则返回 None。
         """
-        current_round = len(messages)
-        
         if current_round >= max_rounds:
             # 触发熔断：构造强制结束提示
             logger.warning(f"Circuit breaker triggered: {current_round} rounds >= {max_rounds} max rounds")
@@ -225,10 +285,29 @@ def build_expert_graph(
             
             # 执行强制推理：构造消息列表
             # TODO: 强制兜底回复，不传入历史对话，因为传入历史对话模型会继续问工具，因此直接兜底回复
-            new_messages = [force_stop_msg]
+            # Some providers require a user turn; keep it minimal to avoid 400s.
+            new_messages = [
+                force_stop_msg,
+                HumanMessage(content="请直接输出最终 JSON（不要调用工具，不要输出解释）。"),
+            ]
             
             # 关键：使用原始 LLM（未绑定工具），物理上切断工具调用路径
-            response = await raw_llm.ainvoke(new_messages)
+            try:
+                response = await raw_llm.ainvoke(new_messages)
+            except Exception as e:
+                # If provider rejects the request (e.g., 400) or is unavailable, return a minimal valid JSON
+                # so the pipeline can proceed with a conservative, low-confidence result.
+                logger.error(f"Circuit breaker fallback LLM call failed: {type(e).__name__}: {e}")
+                fallback_json = {
+                    "risk_type": risk_context.risk_type.value,
+                    "file_path": risk_context.file_path,
+                    "line_number": [risk_context.line_number[0], risk_context.line_number[1]],
+                    "description": risk_context.description,
+                    "confidence": 0.0,
+                    "severity": "info",
+                    "suggestion": None,
+                }
+                return {"messages": [SystemMessage(content=json.dumps(fallback_json, ensure_ascii=False))]}
             
             if hasattr(response, "tool_calls"):
                 response.tool_calls = []
@@ -316,6 +395,11 @@ def build_expert_graph(
         file_content = state.get("file_content", "")
         risk_type_str = risk_context.risk_type.value
         
+        # 计算当前轮次：只统计模型输出轮次（工具消息不计入）。
+        current_round = 1 + sum(1 for m in messages if isinstance(m, AIMessage))
+        line_start, line_end = risk_context.line_number
+        print(f"  🔍 [专家分析] 第 {current_round} 轮 | [{risk_type_str}] {risk_context.file_path}:{line_start}-{line_end}")
+        
         # 构建系统提示词
         system_msg = build_system_message(risk_context, risk_type_str, file_content)
 
@@ -323,6 +407,7 @@ def build_expert_graph(
         max_rounds = config.system.max_expert_rounds if config else 20
         circuit_breaker_result = await handle_circuit_breaker(
             [*messages], 
+            current_round,
             max_rounds,
             llm,  # 传入原始 LLM（未绑定工具）
             format_instructions,  # 传入格式说明
@@ -341,11 +426,18 @@ def build_expert_graph(
             new_messages = [system_msg, *_shrink_history([*messages])]
         
         # 调用 LLM（异步）
-        response = await llm_with_tools.ainvoke(new_messages)
+        try:
+            response = await llm_with_tools.ainvoke(new_messages)
+        except Exception as e:
+            # Print 400 body (or any HTTP error body) to quickly diagnose request format/size/tool support issues.
+            _log_http_error_details(e)
+            raise
         
-        return {
-            "messages": [response]
-        }
+        # Ensure the initial user turn becomes part of state history, so subsequent rounds
+        # have a valid dialogue sequence (some providers validate this strictly).
+        if not messages:
+            return {"messages": [user_msg, response]}
+        return {"messages": [response]}
     
     # 构建图
     graph = StateGraph(ExpertState)
@@ -378,7 +470,8 @@ async def run_expert_analysis(
     graph: Any,
     risk_item: RiskItem,
     diff_context: Optional[str] = None,
-    file_content: Optional[str] = None
+    file_content: Optional[str] = None,
+    recursion_limit: Optional[int] = None,
 ) -> Optional[dict]:
     """运行专家分析子图。
     
@@ -408,7 +501,10 @@ async def run_expert_analysis(
         }
         
         # 运行子图
-        final_state = await graph.ainvoke(initial_state)
+        invoke_kwargs: Dict[str, Any] = {}
+        if recursion_limit is not None:
+            invoke_kwargs["config"] = {"recursion_limit": int(recursion_limit)}
+        final_state = await graph.ainvoke(initial_state, **invoke_kwargs)
         
         # 从消息中提取最后一条消息的文本内容
         messages = final_state.get("messages", [])
@@ -448,4 +544,3 @@ async def run_expert_analysis(
         logger.error(f"Error running expert analysis: {error_msg}")
         logger.error(f"Traceback:\n{''.join(error_traceback)}")
         return None
-

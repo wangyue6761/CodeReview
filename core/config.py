@@ -13,8 +13,8 @@ from pydantic import BaseModel, Field
 class LLMConfig(BaseModel):
     """LLM 提供商配置。"""
     
-    provider: str = Field(default="mock", description="LLM provider name")
-    model: str = Field(default="gpt-4", description="Model name")
+    provider: str = Field(default="deepseek", description="LLM provider name")
+    model: str = Field(default="deepseek-chat", description="Model name")
     api_key: Optional[str] = Field(default=None, description="API key for the provider")
     base_url: Optional[str] = Field(default=None, description="Base URL for API")
     temperature: float = Field(default=0.7, description="Temperature for LLM responses")
@@ -133,12 +133,15 @@ class Config(BaseModel):
             llm_config.base_url = os.getenv("LLM_BASE_URL", llm_config.base_url)
         
         # Load API key from environment variables
-        # Priority: LLM_API_KEY > DEEPSEEK_API_KEY (if provider is deepseek)
+        # Priority: LLM_API_KEY > provider-specific keys (DEEPSEEK_API_KEY, ZHIPUAI_API_KEY)
         if os.getenv("LLM_API_KEY"):
             llm_config.api_key = os.getenv("LLM_API_KEY", llm_config.api_key)
         elif os.getenv("DEEPSEEK_API_KEY") and llm_config.provider == "deepseek":
             # Only use DEEPSEEK_API_KEY if provider is already set to "deepseek"
             llm_config.api_key = os.getenv("DEEPSEEK_API_KEY")
+        elif os.getenv("ZHIPUAI_API_KEY") and llm_config.provider == "zhipuai":
+            # Only use ZHIPUAI_API_KEY if provider is already set to "zhipuai"
+            llm_config.api_key = os.getenv("ZHIPUAI_API_KEY")
         if os.getenv("LLM_TEMPERATURE"):
             try:
                 llm_config.temperature = float(os.getenv("LLM_TEMPERATURE", str(llm_config.temperature)))

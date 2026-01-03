@@ -195,7 +195,8 @@ async def run_expert_group(
                     graph=expert_graph,
                     risk_item=task,
                     diff_context=extract_file_diff(diff_context, task.file_path),
-                    file_content=file_content
+                    file_content=file_content,
+                    recursion_limit=max(100, int(config.system.max_expert_rounds) * 4),
                 )
                 
                 if not analysis_result:
@@ -248,5 +249,4 @@ async def run_expert_group(
                 f"{len(validated_results)} validated results")
     
     return validated_results
-
 

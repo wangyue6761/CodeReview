@@ -48,13 +48,13 @@ async def intent_analysis_node(state: ReviewState) -> Dict[str, Any]:
     
     # ===== 临时调试：文件过滤 =====
     # TODO: 调试完成后删除此代码块
-    # TARGET_FILE = "src/sentry/api/endpoints/organization_auditlogs.py"  # 修改为要调试的文件路径
-    # changed_files = [f for f in changed_files if f == TARGET_FILE or f.endswith(TARGET_FILE)]
-    # if changed_files:
-    #     print(f"  🔍 [调试模式] 过滤后只分析文件: {changed_files}")
-    # else:
-    #     print(f"  ⚠️  [调试模式] 目标文件 '{TARGET_FILE}' 不在变更列表中")
-    #     return {"file_analyses": []}
+    TARGET_FILE = "src/sentry/testutils/factories.py"  # 修改为要调试的文件路径
+    changed_files = [f for f in changed_files if f == TARGET_FILE or f.endswith(TARGET_FILE)]
+    if changed_files:
+        print(f"  🔍 [调试模式] 过滤后只分析文件: {changed_files}")
+    else:
+        print(f"  ⚠️  [调试模式] 目标文件 '{TARGET_FILE}' 不在变更列表中")
+        return {"file_analyses": []}
     # ===== 临时调试代码结束 =====
     
     print(f"  📁 待分析文件数: {len(changed_files)}")
