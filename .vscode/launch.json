@@ -11,9 +11,9 @@
                 "--repo",
                 "/Users/wangyue/Code/CodeReviewData/ReviewDataset/sentry-greptile",
                 "--base",
-                "workflow-engine-stateful-detector-before",
+                "replays-delete-vulnerable",
                 "--head",
-                "workflow-engine-stateful-detector-after"
+                "replays-delete-stable"
             ],
             "console": "integratedTerminal",
             "justMyCode": false,

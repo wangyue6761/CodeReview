@@ -463,14 +463,14 @@ class ExpertGraphRuntime:
 
         tool_calls_used = self._count_tool_messages(messages)
         try:
-            max_no_signal = int(os.environ.get("EXPERT_MAX_CONSECUTIVE_NO_SIGNAL_TOOLS", "3"))
+            max_no_signal = int(os.environ.get("EXPERT_MAX_CONSECUTIVE_NO_SIGNAL_TOOLS", "5"))
         except Exception:
-            max_no_signal = 3
+            max_no_signal = 5
         max_no_signal = max(1, max_no_signal)
         try:
-            no_signal_window = int(os.environ.get("EXPERT_NO_SIGNAL_WINDOW", str(max_no_signal)))
+            no_signal_window = int(os.environ.get("EXPERT_NO_SIGNAL_WINDOW", "10"))
         except Exception:
-            no_signal_window = max_no_signal
+            no_signal_window = 10
         no_signal_window = max(1, no_signal_window)
 
         if max_tool_calls == 0 and tool_calls_used > 0:

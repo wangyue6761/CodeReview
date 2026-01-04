@@ -1,7 +1,7 @@
 """基于 LangGraph 的多智能体代码审查工作流。
 
 工作流结构：
-1. Intent Analysis（Map-Reduce）：并行分析文件意图
+1. Intent Analysis（Map-Reduce）：并行分析文件意图（或大 PR 降级为 chunked diff-only）
 2. Manager：生成任务列表并按风险类型分组
 3. Expert Execution：并行执行专家组任务（并发控制）
 4. Reporter：生成最终报告
@@ -18,6 +18,7 @@ from core.state import ReviewState
 from core.llm_factory import create_chat_model
 from core.config import Config
 from tools.langchain_tools import create_tools_with_context
+from agents.nodes.intent_analysis_chunked import intent_analysis_chunked_node
 from agents.nodes.intent_analysis import intent_analysis_node
 from agents.nodes.manager import manager_node
 from agents.nodes.expert_execution import expert_execution_node
@@ -26,6 +27,45 @@ from util.expert_stats import format_tool_call_summary
 from util.runtime_utils import ensure_run_started, elapsed_seconds, elapsed_tag, format_duration
 
 logger = logging.getLogger(__name__)
+
+def _env_int(name: str, default: int) -> int:
+    import os
+    v = (os.getenv(name) or "").strip()
+    if not v:
+        return int(default)
+    try:
+        return int(v)
+    except Exception:
+        return int(default)
+
+
+def _should_use_chunked_intent(state: ReviewState) -> bool:
+    """Corner-case degradation decision: avoid per-file LLM calls on huge PRs."""
+    diff_context = state.get("diff_context", "") or ""
+    changed_files = state.get("changed_files", []) or []
+    file_threshold = _env_int("INTENT_DEGRADE_FILE_THRESHOLD", 15)
+    diff_chars_threshold = _env_int("INTENT_DEGRADE_DIFF_CHARS_THRESHOLD", 150_000)
+    return (len(changed_files) >= file_threshold) or (len(diff_context) >= diff_chars_threshold)
+
+
+async def intent_router_node(state: ReviewState) -> ReviewState:
+    """No-op node that records the intent mode decision into metadata."""
+    meta = dict(state.get("metadata") or {})
+    mode = "chunked" if _should_use_chunked_intent(state) else "per_file"
+    meta["intent_mode"] = mode
+    meta["intent_router"] = {
+        "changed_files": len(state.get("changed_files", []) or []),
+        "diff_chars": len(state.get("diff_context", "") or ""),
+    }
+    return {"metadata": meta}
+
+
+def route_to_intent(state: ReviewState) -> str:
+    """Route to per-file intent or chunked diff-only intent based on PR size."""
+    mode = (state.get("metadata") or {}).get("intent_mode")
+    if mode == "chunked":
+        return "intent_analysis_chunked"
+    return "intent_analysis"
 
 
 def create_multi_agent_workflow(
@@ -58,17 +98,30 @@ def create_multi_agent_workflow(
     workflow = StateGraph(ReviewState)
     
     # Add nodes
+    workflow.add_node("intent_router", intent_router_node)
     workflow.add_node("intent_analysis", intent_analysis_node)
+    workflow.add_node("intent_analysis_chunked", intent_analysis_chunked_node)
     workflow.add_node("manager", manager_node)
     workflow.add_node("expert_execution", expert_execution_node)
     workflow.add_node("reporter", reporter_node)
     
     # Set entry point
-    workflow.set_entry_point("intent_analysis")
+    workflow.set_entry_point("intent_router")
     
     # Add edges
+    # Intent Router -> Intent Analysis (per-file) or Chunked Intent (conditional)
+    workflow.add_conditional_edges(
+        "intent_router",
+        route_to_intent,
+        {
+            "intent_analysis": "intent_analysis",
+            "intent_analysis_chunked": "intent_analysis_chunked",
+        }
+    )
+
     # Intent Analysis -> Manager
     workflow.add_edge("intent_analysis", "manager")
+    workflow.add_edge("intent_analysis_chunked", "manager")
     
     # Manager -> Expert Execution or Reporter (conditional)
     workflow.add_conditional_edges(
