@@ -18,9 +18,36 @@ from langchain_core.messages import AIMessage, BaseMessage, HumanMessage, System
 from agents.prompts import render_prompt_template
 from core.config import Config
 from core.state import ExpertState, RiskItem
+from util.json_utils import extract_json_from_text
 from util.console_utils import vprint
 
 logger = logging.getLogger(__name__)
+
+def _safe_float(v: Any, default: float) -> float:
+    try:
+        return float(v)
+    except Exception:
+        return float(default)
+
+
+def _clamp_riskitem_json(text: str, *, clamp_confidence: float) -> Optional[str]:
+    """Best-effort: extract JSON and clamp confidence (keeping JSON-only output)."""
+    json_text = extract_json_from_text(text or "")
+    if not json_text:
+        return None
+    try:
+        data = json.loads(json_text)
+    except Exception:
+        return None
+    if not isinstance(data, dict):
+        return None
+
+    if "confidence" in data:
+        data["confidence"] = min(_safe_float(data.get("confidence"), 0.0), float(clamp_confidence))
+    else:
+        data["confidence"] = min(0.0, float(clamp_confidence))
+
+    return json.dumps(data, ensure_ascii=False)
 
 def log_http_error_details(err: Exception, *, max_body_chars: int = 4000) -> None:
     """Best-effort logging for provider HTTP errors (e.g. httpx.HTTPStatusError)."""
@@ -400,12 +427,18 @@ class ExpertGraphRuntime:
             return None
 
         logger.warning(f"Circuit breaker triggered: {current_round} rounds > {max_rounds} max rounds")
+        clamp_conf = 0.55
+        try:
+            clamp_conf = float(getattr(getattr(self.config, "system", None), "expert_confidence_clamp_on_budget_stop", 0.55))
+        except Exception:
+            clamp_conf = 0.55
         force_stop_content = f"""⚠️ **紧急停止：分析轮次已达上限 ({current_round} > {max_rounds})**
 
                 **请立即停止调用任何工具！直接最终分析！**
 
                 请根据目前已收集到的信息，**直接输出最终的 JSON 结果**。
                 即使信息不完整，也要基于现有证据给出判断。
+                如果无法给出可核验的代码证据（diff/代码窗口/工具输出），请将 `confidence <= {clamp_conf}`（建议更低），避免误报。
 
                 ## 当前任务锚点
                 风险类型: {risk_context.risk_type.value}
@@ -449,7 +482,20 @@ class ExpertGraphRuntime:
 
         if hasattr(response, "tool_calls"):
             response.tool_calls = []
-        return {"messages": [response]}
+        clamped = _clamp_riskitem_json(getattr(response, "content", "") or "", clamp_confidence=clamp_conf)
+        if clamped:
+            return {"messages": [AIMessage(content=clamped)]}
+
+        fallback_json = {
+            "risk_type": risk_context.risk_type.value,
+            "file_path": risk_context.file_path,
+            "line_number": [risk_context.line_number[0], risk_context.line_number[1]],
+            "description": risk_context.description,
+            "confidence": float(clamp_conf),
+            "severity": "info",
+            "suggestion": "轮次熔断后未能提取有效 JSON；请手动复核该风险是否真实且可锚定到变更。",
+        }
+        return {"messages": [AIMessage(content=json.dumps(fallback_json, ensure_ascii=False))]}
 
     async def handle_tool_budget(
         self,
@@ -483,9 +529,14 @@ class ExpertGraphRuntime:
             return None
 
         logger.warning(f"Tool budget stop triggered: {reason}")
+        clamp_conf = 0.55
+        try:
+            clamp_conf = float(getattr(getattr(self.config, "system", None), "expert_confidence_clamp_on_budget_stop", 0.55))
+        except Exception:
+            clamp_conf = 0.55
         force_stop_content = f"""⚠️ **停止工具调用：{reason}**
             请基于当前已掌握的信息直接完成最终判断并输出 JSON。
-            注意：某些结论可以基于语言语义/常识成立，不一定能在仓库中找到“文字证据”。不要继续尝试全仓库搜索。
+            如果你无法在 diff/代码窗口/工具输出中指出可核验的证据点，请将 `confidence <= {clamp_conf}`（建议更低），避免把推断当作确认问题。
 
             ## 当前任务锚点
             风险类型: {risk_context.risk_type.value}
@@ -528,4 +579,17 @@ class ExpertGraphRuntime:
 
         if hasattr(response, "tool_calls"):
             response.tool_calls = []
-        return {"messages": [response]}
+        clamped = _clamp_riskitem_json(getattr(response, "content", "") or "", clamp_confidence=clamp_conf)
+        if clamped:
+            return {"messages": [AIMessage(content=clamped)]}
+
+        fallback_json = {
+            "risk_type": risk_context.risk_type.value,
+            "file_path": risk_context.file_path,
+            "line_number": [risk_context.line_number[0], risk_context.line_number[1]],
+            "description": risk_context.description,
+            "confidence": float(clamp_conf),
+            "severity": "info",
+            "suggestion": "工具预算停止后未能提取有效 JSON；请手动复核该风险是否真实且可锚定到变更。",
+        }
+        return {"messages": [AIMessage(content=json.dumps(fallback_json, ensure_ascii=False))]}

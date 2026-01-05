@@ -38,6 +38,40 @@ system:
   workspace_root: "."           # Root directory of the workspace
   assets_dir: "assets_cache"    # Directory for storing built assets
   timeout_seconds: 600           # Maximum time for analysis (10 minutes)
-  max_concurrent_llm_requests: 1
+  max_concurrent_llm_requests: 2
   max_expert_rounds: 22         # Maximum rounds for expert analysis (circuit breaker)
   max_expert_tool_calls: 20
+
+  # ===== Noise control: file path filtering =====
+  # 默认启用内置排除（锁文件/生成物/二进制/媒体/日志等），可用 include/exclude 进行覆盖
+  path_filter_enabled: true
+  path_filter_include_globs: []     # 例如 ["**/*.svg"] 强制把 svg 纳入审查
+  path_filter_exclude_globs: []     # 例如 ["**/vendor/**"] 额外排除
+
+  # ===== Reporter threshold =====
+  confidence_threshold: 0.6
+  # 可选：按风险类型设置更严格阈值（例如降低 Robustness 误报）
+  # confidence_threshold_by_risk_type:
+  #   Robustness_Boundary_Conditions: 0.75
+
+  # ===== Manager gating / budgeting =====
+  manager_anchor_window: 5          # 仅保留落在变更行±N 的风险
+  manager_drop_unanchored: true
+  manager_unanchored_confidence: 0.2
+  manager_max_work_items_total: 15
+  manager_max_items_per_file: 3
+  # 建议：对 Robustness 做小配额，优先留给 Concurrency/Authorization/Lifecycle
+  manager_max_items_per_risk_type:
+    Robustness_Boundary_Conditions: 4
+    Concurrency_Timing_Correctness: 4
+    Authorization_Data_Exposure: 3
+    Lifecycle_State_Consistency: 3
+    Intent_Semantic_Consistency: 2
+    Syntax_Static_Errors: 10
+  manager_risk_type_weights: {}         # 为空则使用内置默认（降低 Robustness 权重）
+  manager_severity_weights: {}          # 为空则使用内置默认（error>warning>info）
+  manager_merge_line_window: 5
+  manager_merge_jaccard: 0.75
+
+  # ===== Expert calibration =====
+  expert_confidence_clamp_on_budget_stop: 0.55

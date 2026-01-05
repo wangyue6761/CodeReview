@@ -264,6 +264,12 @@ async def run_multi_agent_workflow(
     app = create_multi_agent_workflow(config)
     
     # Initialize state
+    confidence_threshold = 0.6
+    try:
+        confidence_threshold = float(getattr(getattr(config, "system", None), "confidence_threshold", 0.6))
+    except Exception:
+        confidence_threshold = 0.6
+
     initial_state: ReviewState = {
         "messages": [],
         "diff_context": diff_context,
@@ -278,7 +284,7 @@ async def run_multi_agent_workflow(
         "metadata": {
             "workflow_version": "multi_agent_parallel",
             "config_provider": config.llm.provider,
-            "confidence_threshold": 0.6
+            "confidence_threshold": confidence_threshold
         }
     }
     ensure_run_started(initial_state["metadata"])

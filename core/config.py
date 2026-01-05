@@ -6,7 +6,7 @@
 import json
 import os
 from pathlib import Path
-from typing import Optional
+from typing import Dict, List, Optional
 from pydantic import BaseModel, Field, AliasChoices
 
 
@@ -34,6 +34,75 @@ class SystemConfig(BaseModel):
         ge=0,
         validation_alias=AliasChoices("max_expert_tool_calls", "max_expert_tool_call"),
         description="Maximum tool calls per expert analysis (0 = no tools)",
+    )
+
+    # ===== Noise control / file path filtering =====
+    path_filter_enabled: bool = Field(default=True, description="Whether to filter out low-signal file paths")
+    path_filter_include_globs: List[str] = Field(
+        default_factory=list,
+        description="Glob patterns that force-include files even if excluded by defaults",
+    )
+    path_filter_exclude_globs: List[str] = Field(
+        default_factory=list,
+        description="Additional glob patterns to exclude from review",
+    )
+
+    # ===== Manager gating / budgeting =====
+    manager_anchor_window: int = Field(
+        default=5,
+        ge=0,
+        description="Anchor window (±N lines) for keeping risks near changed lines",
+    )
+    manager_drop_unanchored: bool = Field(
+        default=True,
+        description="Drop risk items that are not anchored to changed lines (or near them)",
+    )
+    manager_unanchored_confidence: float = Field(
+        default=0.2,
+        ge=0.0,
+        le=1.0,
+        description="If not dropping unanchored items, cap their confidence to this value",
+    )
+    manager_max_work_items_total: int = Field(default=30, ge=1, description="Max total work items sent to experts")
+    manager_max_items_per_file: int = Field(default=6, ge=1, description="Max work items per file")
+    manager_max_items_per_risk_type: Dict[str, int] = Field(
+        default_factory=dict,
+        description="Optional per-risk-type caps; keys are RiskType values",
+    )
+    manager_risk_type_weights: Dict[str, float] = Field(
+        default_factory=dict,
+        description="Optional per-risk-type weights; keys are RiskType values",
+    )
+    manager_severity_weights: Dict[str, float] = Field(
+        default_factory=dict,
+        description="Optional per-severity weights: error/warning/info",
+    )
+    manager_merge_line_window: int = Field(default=5, ge=0, description="Merge window for near-duplicate risks (lines)")
+    manager_merge_jaccard: float = Field(
+        default=0.75,
+        ge=0.0,
+        le=1.0,
+        description="Jaccard threshold for merging near-duplicate risk descriptions",
+    )
+
+    # ===== Reporter / confirmation =====
+    confidence_threshold: float = Field(
+        default=0.6,
+        ge=0.0,
+        le=1.0,
+        description="Minimum confidence to be considered confirmed in reporter",
+    )
+    confidence_threshold_by_risk_type: Dict[str, float] = Field(
+        default_factory=dict,
+        description="Optional per-risk-type confidence thresholds; keys are RiskType values",
+    )
+
+    # ===== Expert calibration =====
+    expert_confidence_clamp_on_budget_stop: float = Field(
+        default=0.55,
+        ge=0.0,
+        le=1.0,
+        description="Clamp expert confidence to this value when tool budget stop is triggered",
     )
 
 

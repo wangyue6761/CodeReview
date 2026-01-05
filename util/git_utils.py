@@ -7,7 +7,148 @@ import subprocess
 from pathlib import Path
 from typing import List, Optional, Tuple
 
+from core.config import Config
+from pathlib import PurePosixPath
+
 logger = logging.getLogger(__name__)
+
+_DEFAULT_EXCLUDE_GLOBS: List[str] = [
+    # Dependency / lock files
+    "**/package-lock.json",
+    "**/yarn.lock",
+    "**/pnpm-lock.yaml",
+    "**/bun.lockb",
+    "**/Gemfile.lock",
+    "**/Cargo.lock",
+    "**/go.sum",
+    "**/go.mod",
+    "**/poetry.lock",
+    "**/Pipfile.lock",
+    "**/*.lock",
+    # Build output / generated
+    "**/dist/**",
+    "**/build/**",
+    "**/out/**",
+    "**/.next/**",
+    "**/.nuxt/**",
+    "**/.svelte-kit/**",
+    "**/.cache/**",
+    "**/coverage/**",
+    "**/node_modules/**",
+    "**/generated/**",
+    "**/@generated/**",
+    "**/__generated__/**",
+    "**/__generated/**",
+    "**/_generated/**",
+    "**/gen/**",
+    "**/@gen/**",
+    "**/__gen__/**",
+    "**/__gen/**",
+    "**/_gen/**",
+    # Logs
+    "**/*.log",
+    # Binary / archives
+    "**/*.exe",
+    "**/*.dll",
+    "**/*.so",
+    "**/*.dylib",
+    "**/*.class",
+    "**/*.o",
+    "**/*.a",
+    "**/*.wasm",
+    "**/*.jar",
+    "**/*.war",
+    "**/*.zip",
+    "**/*.tar",
+    "**/*.gz",
+    "**/*.bz2",
+    "**/*.xz",
+    "**/*.7z",
+    "**/*.rar",
+    # Media / documents / fonts
+    "**/*.png",
+    "**/*.jpg",
+    "**/*.jpeg",
+    "**/*.gif",
+    "**/*.bmp",
+    "**/*.tiff",
+    "**/*.webm",
+    "**/*.svg",
+    "**/*.pdf",
+    "**/*.doc",
+    "**/*.docx",
+    "**/*.xls",
+    "**/*.xlsx",
+    "**/*.ppt",
+    "**/*.pptx",
+    "**/*.ttf",
+    "**/*.otf",
+    "**/*.woff",
+    "**/*.woff2",
+]
+
+
+def _normalize_posix_path(p: str) -> str:
+    s = (p or "").strip().replace("\\", "/")
+    while s.startswith("./"):
+        s = s[2:]
+    while s.startswith("/"):
+        s = s[1:]
+    return s
+
+
+def _path_matches_any(path: str, patterns: List[str]) -> bool:
+    if not patterns:
+        return False
+    posix_path = _normalize_posix_path(path)
+    pp = PurePosixPath(posix_path)
+    for pat in patterns:
+        pat = (pat or "").strip()
+        if not pat:
+            continue
+        try:
+            if pp.match(pat):
+                return True
+        except Exception:
+            # If a pattern is malformed, ignore it (avoid breaking reviews).
+            continue
+    return False
+
+
+def filter_changed_files(files: List[str], config: Optional[Config] = None) -> List[str]:
+    """Filter low-signal file paths (locks, generated, binaries, etc.)."""
+    if not files:
+        return []
+
+    enabled = True
+    include_globs: List[str] = []
+    extra_excludes: List[str] = []
+
+    try:
+        if config and getattr(config, "system", None):
+            enabled = bool(getattr(config.system, "path_filter_enabled", True))
+            include_globs = list(getattr(config.system, "path_filter_include_globs", []) or [])
+            extra_excludes = list(getattr(config.system, "path_filter_exclude_globs", []) or [])
+    except Exception:
+        enabled = True
+
+    if not enabled:
+        return [f for f in files if (f or "").strip()]
+
+    exclude_globs = [*_DEFAULT_EXCLUDE_GLOBS, *extra_excludes]
+    kept: List[str] = []
+    for f in files:
+        f = (f or "").strip()
+        if not f:
+            continue
+        if _path_matches_any(f, include_globs):
+            kept.append(f)
+            continue
+        if _path_matches_any(f, exclude_globs):
+            continue
+        kept.append(f)
+    # Keep deterministic ordering.
+    return sorted(set(kept))
 
 
 def get_git_info(repo_path: Path, ref: str = "HEAD") -> Tuple[Optional[str], Optional[str]]:
@@ -46,7 +187,7 @@ def get_git_info(repo_path: Path, ref: str = "HEAD") -> Tuple[Optional[str], Opt
         return (None, None)
 
 
-def get_changed_files(repo_path: Path, base: str, head: str = "HEAD") -> List[str]:
+def get_changed_files(repo_path: Path, base: str, head: str = "HEAD", config: Optional[Config] = None) -> List[str]:
     """获取两个 Git 引用之间变更的文件列表。
     
     此函数执行 `git diff --name-only {base}...{head}` 以获取两个引用之间变更的文件列表。
@@ -138,7 +279,7 @@ def get_changed_files(repo_path: Path, base: str, head: str = "HEAD") -> List[st
         )
         # Filter out empty lines and return list of file paths
         files = [f.strip() for f in result.stdout.strip().split("\n") if f.strip()]
-        return files
+        return filter_changed_files(files, config)
     except subprocess.CalledProcessError as e:
         error_msg = e.stderr.strip() if e.stderr else "Unknown git error"
         if "fatal:" in error_msg.lower() or "error:" in error_msg.lower():
@@ -575,7 +716,7 @@ def generate_asset_key(repo_path: Path, branch: Optional[str] = None, commit: Op
     return key
 
 
-def extract_files_from_diff(diff_content: str) -> List[str]:
+def extract_files_from_diff(diff_content: str, config: Optional[Config] = None) -> List[str]:
     """Extract file paths from a Git diff string.
     
     This function parses a Git diff to extract the list of files that were changed.
@@ -621,7 +762,7 @@ def extract_files_from_diff(diff_content: str) -> List[str]:
         if rename_to_match:
             files.add(rename_to_match.group(1))
     
-    return sorted(list(files))
+    return filter_changed_files(sorted(list(files)), config)
 
 
 def get_repo_name(workspace_root: Path) -> str:

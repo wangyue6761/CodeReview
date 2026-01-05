@@ -50,9 +50,16 @@ async def reporter_node(state: ReviewState) -> Dict[str, Any]:
     
     # Filter by confidence threshold (default: 0.5)
     confidence_threshold = state.get("metadata", {}).get("confidence_threshold", 0.5)
+    config = state.get("metadata", {}).get("config")
+    threshold_by_type = {}
+    try:
+        threshold_by_type = dict(getattr(getattr(config, "system", None), "confidence_threshold_by_risk_type", {}) or {})
+    except Exception:
+        threshold_by_type = {}
+
     confirmed_issues = [
         item for item in all_results
-        if item.confidence >= confidence_threshold
+        if item.confidence >= float(threshold_by_type.get(item.risk_type.value, confidence_threshold))
     ]
     
     print(f"  🔍 按置信度过滤 (阈值: {confidence_threshold})")
@@ -61,7 +68,15 @@ async def reporter_node(state: ReviewState) -> Dict[str, Any]:
     
     logger.info(f"Reporter: {len(all_results)} total results, "
                 f"{len(confirmed_issues)} confirmed issues (threshold: {confidence_threshold})")
-    
+
+    if not confirmed_issues:
+        final_report = _generate_simple_report([])
+        confirmed_issues_dicts: List[Dict[str, Any]] = []
+        return {
+            "confirmed_issues": confirmed_issues_dicts,
+            "final_report": final_report,
+        }
+
     try:
         # Generate final report
         print("  🤖 调用 LLM 生成最终报告...")
@@ -78,7 +93,7 @@ async def reporter_node(state: ReviewState) -> Dict[str, Any]:
             SystemMessage(content="You are an expert code reviewer generating a final review report."),
             HumanMessage(content=prompt)
         ]
-        response = await llm.ainvoke(messages, temperature=0.3)
+        response = await llm.ainvoke(messages)
         final_report = response.content if hasattr(response, 'content') else str(response)
         
         print(f"  ✅ Reporter 完成! ({elapsed_tag(meta)})")

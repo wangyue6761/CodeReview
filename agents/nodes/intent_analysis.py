@@ -17,9 +17,29 @@ from core.state import ReviewState, FileAnalysis, RiskItem, RiskType
 from agents.prompts import render_prompt_template
 from util.diff_utils import generate_context_text_for_file, extract_file_diff
 from util.file_utils import read_file_content
+from util.json_utils import extract_json_from_text
 from util.runtime_utils import elapsed_tag
 
 logger = logging.getLogger(__name__)
+
+def _normalize_line_number(v: Any) -> Any:
+    """Best-effort normalization to [start, end] for RiskItem parsing."""
+    if v is None:
+        return None
+    if isinstance(v, int):
+        return [int(v), int(v)]
+    if isinstance(v, str):
+        s = v.strip()
+        if s.isdigit():
+            n = int(s)
+            return [n, n]
+    if isinstance(v, (list, tuple)):
+        if len(v) == 1:
+            n = int(v[0])
+            return [n, n]
+        if len(v) == 2:
+            return [int(v[0]), int(v[1])]
+    return None
 
 
 async def intent_analysis_node(state: ReviewState) -> Dict[str, Any]:
@@ -101,16 +121,26 @@ async def intent_analysis_node(state: ReviewState) -> Dict[str, Any]:
                 ]
                 
                 # 使用 LCEL 语法：messages -> llm -> parser
+                response_text = ""
                 try:
-                    # 调用 LLM
-                    response = await llm.ainvoke(messages, temperature=0.3)
-                    # 解析为 Pydantic 模型
-                    response_text = response.content if hasattr(response, 'content') else str(response)
-                    file_analysis: FileAnalysis = parser.parse(response_text)
+                    # Avoid per-call temperature overrides for provider compat; rely on model config.
+                    response = await llm.ainvoke(messages)
+                    response_text = response.content if hasattr(response, "content") else str(response)
                 except Exception as e:
-                    # 如果解析失败，回退到文本解析
+                    # LLM 调用失败：回退到文本解析（通常为 provider 错误/余额不足等）
+                    logger.warning(
+                        f"LLM invoke failed for {file_path}, falling back to text parsing: "
+                        f"{type(e).__name__}: {e!r}"
+                    )
+                    response_text = str(e) if str(e) else type(e).__name__
+
+                try:
+                    # Some providers/models may wrap JSON in markdown or add preamble; extract JSON first.
+                    json_text = extract_json_from_text(response_text) or response_text
+                    file_analysis: FileAnalysis = parser.parse(json_text)
+                except Exception as e:
+                    # 解析失败：回退到文本解析
                     logger.warning(f"PydanticOutputParser failed for {file_path}, falling back to text parsing: {e}")
-                    response_text = response.content if hasattr(response, 'content') else str(response)
                     file_analysis = _parse_intent_analysis_response(response_text, file_path)
                 
                 print(f"  ✅ 完成: {file_path}")
@@ -151,18 +181,9 @@ async def intent_analysis_node(state: ReviewState) -> Dict[str, Any]:
 def _parse_intent_analysis_response(response: str, file_path: str) -> FileAnalysis:
     """解析 LLM 响应为 FileAnalysis 对象（PydanticOutputParser 失败时的回退方案）。"""
     try:
-        # Try to parse as JSON first
-        response_clean = response.strip()
-        if response_clean.startswith("```json"):
-            response_clean = response_clean[7:]
-        if response_clean.startswith("```"):
-            response_clean = response_clean[3:]
-        if response_clean.endswith("```"):
-            response_clean = response_clean[:-3]
-        response_clean = response_clean.strip()
-        
         try:
-            data = json.loads(response_clean)
+            json_text = extract_json_from_text(response) or ""
+            data = json.loads(json_text) if json_text else {}
             intent_summary = data.get("intent_summary", response[:500])
             potential_risks_data = data.get("potential_risks", [])
             complexity_score = data.get("complexity_score")
@@ -171,7 +192,7 @@ def _parse_intent_analysis_response(response: str, file_path: str) -> FileAnalys
             potential_risks = []
             for risk_data in potential_risks_data:
                 try:
-                    line_number = risk_data.get("line_number")
+                    line_number = _normalize_line_number(risk_data.get("line_number"))
                     if line_number is None:
                         logger.error(f"Missing line_number in risk item: {risk_data}, file_path: {file_path}")
                         continue
@@ -196,7 +217,7 @@ def _parse_intent_analysis_response(response: str, file_path: str) -> FileAnalys
                 potential_risks=potential_risks,
                 complexity_score=complexity_score
             )
-        except json.JSONDecodeError:
+        except Exception:
             # If JSON parsing fails, create a simple FileAnalysis from text
             return FileAnalysis(
                 file_path=file_path,

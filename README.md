@@ -108,17 +108,25 @@ pip install pyyaml
    注意：如果工具未安装，系统会优雅降级（跳过检查并显示警告），不会导致系统崩溃。
 
 5. 配置 DeepSeek（如使用）：
-   - 在 `~/.zshrc` 中设置 `DEEPSEEK_API_KEY` 环境变量：
+5. 配置 LLM（推荐使用环境变量，避免把 key 写进配置文件）：
+   - 通用环境变量（最高优先级）：
      ```bash
-     export DEEPSEEK_API_KEY="your-deepseek-api-key"
+     export LLM_PROVIDER="zhipuai"     # openai / deepseek / zhipuai
+     export LLM_MODEL="glm-4.6"        # 按 provider 选择
+     export LLM_API_KEY="your-key"
      ```
-   - 或在 `config.yaml` 中配置：
+   - provider 专用环境变量（当 `LLM_API_KEY` 未设置时使用）：
+     ```bash
+     export DEEPSEEK_API_KEY="your-deepseek-key"   # provider=deepseek
+     export ZHIPUAI_API_KEY="your-zhipuai-key"     # provider=zhipuai
+     ```
+   - 或在 `config.yaml` 中配置（不推荐直接提交 key）：
      ```yaml
      llm:
-       provider: "deepseek"
-       model: "deepseek-chat"
-       api_key: "your-api-key"
-       base_url: "https://api.deepseek.com"
+       provider: "zhipuai"  # openai / deepseek / zhipuai
+       model: "glm-4.6"
+       api_key: null
+       temperature: 0
      ```
 
 ## 使用方法
@@ -215,8 +223,8 @@ asyncio.run(review_code())
 
 ```yaml
 llm:
-  provider: "deepseek"  # 选项: "openai", "deepseek", "mock"
-  model: "deepseek-chat"
+  provider: "deepseek"  # 选项: "openai", "deepseek", "zhipuai"
+  model: "deepseek-chat"  # deepseek-chat / glm-4.6 / gpt-4o 等
   api_key: null  # 可通过 DEEPSEEK_API_KEY 或 LLM_API_KEY 环境变量设置
   base_url: "https://api.deepseek.com"
   temperature: 0.7
@@ -226,15 +234,44 @@ system:
   assets_dir: "assets_cache"
   timeout_seconds: 600  # 10 分钟
   max_concurrent_llm_requests: 10
+
+  # ===== Noise control: file path filtering =====
+  # 默认排除锁文件/生成物/二进制/媒体/日志等，可用 include/exclude 覆盖
+  path_filter_enabled: true
+  path_filter_include_globs: []
+  path_filter_exclude_globs: []
+
+  # ===== Reporter threshold =====
+  confidence_threshold: 0.6
+  # 可选：按风险类型设置更严格阈值（例如降低 Robustness 误报）
+  # confidence_threshold_by_risk_type:
+  #   Robustness_Boundary_Conditions: 0.75
+
+  # ===== Manager gating / budgeting =====
+  manager_anchor_window: 5
+  manager_drop_unanchored: true
+  manager_unanchored_confidence: 0.2
+  manager_max_work_items_total: 15
+  manager_max_items_per_file: 3
+  manager_max_items_per_risk_type: {}
+  manager_risk_type_weights: {}
+  manager_severity_weights: {}
+  manager_merge_line_window: 5
+  manager_merge_jaccard: 0.75
+
+  # ===== Expert calibration =====
+  expert_confidence_clamp_on_budget_stop: 0.55
 ```
 
-环境变量优先级：`LLM_API_KEY` > `DEEPSEEK_API_KEY`（当 provider 为 "deepseek" 时）
+环境变量优先级：`LLM_API_KEY` > provider 专用 key（如 `DEEPSEEK_API_KEY` / `ZHIPUAI_API_KEY`）
 
 ## 功能特性
 
 ### 核心功能
 
 - ✅ **多智能体工作流**：4 节点流水线（意图分析、管理、专家执行、报告）
+- ✅ **降噪与聚焦**：默认过滤低信号文件（锁文件/生成物/二进制/媒体/日志等）；Manager 强制锚定到变更行±N，并做预算分配与去重合并
+- ✅ **置信度校准**：在专家触发工具预算/轮次熔断时自动压低置信度上限，避免“无证据推断”进入 confirmed
 - ✅ **可扩展 DAO 层**：基于文件的存储（MVP），接口已就绪，可迁移到 SQL/NoSQL/GraphDB 后端
 - ✅ **资产管理**：RepoMap 构建器，自动 DAO 持久化（幂等构建）
 - ✅ **MCP 兼容工具**：标准化工具接口（FetchRepoMapTool、ReadFileTool）
@@ -262,6 +299,7 @@ log/
 - 所有工具调用（输入参数和结果）
 - 专家分析结果
 - 元数据（仓库、模型、时间戳）
+注：终端输出会跳过/脱敏可能包含密钥的字段，避免 API key 泄漏到日志中。
 
 ## 项目结构
 
@@ -296,9 +334,9 @@ CodeReview/
 │       └── reporter.py          # 报告生成节点
 ├── core/                   # 核心工具
 │   ├── config.py           # 配置管理
-│   ├── llm.py              # LLM 提供商抽象
-│   ├── langchain_llm.py    # LangChain LLM 适配器
+│   ├── llm_factory.py      # LLM 工厂（openai/deepseek/zhipuai）
 │   └── state.py            # LangGraph 状态定义
+│   └── zhipuai_compat.py   # ZhipuAI 工具调用兼容层
 ├── external_tools/         # 外部工具
 │   └── syntax_checker/     # 语法检查器
 │       ├── base.py         # 检查器基类
@@ -357,13 +395,7 @@ CodeReview/
 
 ### 测试
 
-对于无需 API 密钥的测试，使用 mock LLM 提供商：
-
-```python
-config = Config(
-    llm=LLMConfig(provider="mock")
-)
-```
+当前版本未内置 mock provider；运行测试需配置可用的 LLM provider/key（或在后续补充 mock provider 以便离线测试）。
 
 ## 许可证
 

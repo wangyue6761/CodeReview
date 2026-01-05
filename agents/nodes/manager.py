@@ -5,7 +5,9 @@
 """
 
 import logging
-from typing import Dict, Any, List
+import re
+from bisect import bisect_left
+from typing import Dict, Any, List, Optional, Tuple
 from langchain_core.messages import HumanMessage, SystemMessage
 from langchain_core.output_parsers import PydanticOutputParser
 from langchain_core.language_models import BaseChatModel
@@ -13,8 +15,151 @@ from core.state import ReviewState, RiskItem, RiskType, WorkListResponse
 from agents.prompts import render_prompt_template
 from collections import defaultdict
 from util.runtime_utils import elapsed_tag
+from util.diff_utils import parse_diff_with_line_numbers
 
 logger = logging.getLogger(__name__)
+
+
+def _normalize_path(p: str) -> str:
+    s = (p or "").strip()
+    if s.startswith("a/") or s.startswith("b/"):
+        s = s[2:]
+    if s.startswith("/"):
+        s = s[1:]
+    return s
+
+
+def _tokenize(s: str) -> set[str]:
+    if not s:
+        return set()
+    parts = re.split(r"[^a-zA-Z0-9_]+", s.lower())
+    return {p for p in parts if p}
+
+
+def _jaccard(a: set[str], b: set[str]) -> float:
+    if not a or not b:
+        return 0.0
+    inter = a & b
+    union = a | b
+    if not union:
+        return 0.0
+    return len(inter) / len(union)
+
+
+def _is_anchored_to_changes(
+    changed_lines_sorted: List[int],
+    line_range: Tuple[int, int],
+    window: int,
+) -> bool:
+    """Return True if any changed line falls within [start-window, end+window]."""
+    if not changed_lines_sorted:
+        return False
+    start, end = line_range
+    lo = max(1, int(start) - int(window))
+    hi = int(end) + int(window)
+    idx = bisect_left(changed_lines_sorted, lo)
+    return idx < len(changed_lines_sorted) and changed_lines_sorted[idx] <= hi
+
+
+def _severity_rank(sev: str) -> int:
+    s = (sev or "").strip().lower()
+    if s == "error":
+        return 3
+    if s == "warning":
+        return 2
+    return 1
+
+
+def _merge_near_duplicates(
+    items: List[RiskItem],
+    *,
+    line_window: int,
+    jaccard_threshold: float,
+) -> List[RiskItem]:
+    """Merge near-duplicate risks within the same file & risk_type."""
+    if not items:
+        return []
+
+    by_key: Dict[Tuple[str, RiskType], List[RiskItem]] = defaultdict(list)
+    for it in items:
+        by_key[(it.file_path, it.risk_type)].append(it)
+
+    merged: List[RiskItem] = []
+    for (_, _), group in by_key.items():
+        ordered = sorted(group, key=lambda x: (x.line_number[0], x.line_number[1], -x.confidence))
+        cur: Optional[RiskItem] = None
+        cur_tokens: set[str] = set()
+        cur_descs: List[str] = []
+        for it in ordered:
+            if cur is None:
+                cur = it
+                cur_tokens = _tokenize(it.description)
+                cur_descs = [it.description]
+                continue
+
+            near = abs(it.line_number[0] - cur.line_number[1]) <= int(line_window)
+            sim = _jaccard(cur_tokens, _tokenize(it.description))
+            if near and sim >= float(jaccard_threshold):
+                # Merge: keep all original descriptions verbatim, expand line range.
+                start = min(cur.line_number[0], it.line_number[0])
+                end = max(cur.line_number[1], it.line_number[1])
+                cur_descs.append(it.description)
+                cur = RiskItem(
+                    risk_type=cur.risk_type,
+                    file_path=cur.file_path,
+                    line_number=(start, end),
+                    description="\n\n".join(cur_descs),
+                    confidence=max(cur.confidence, it.confidence),
+                    severity=cur.severity if _severity_rank(cur.severity) >= _severity_rank(it.severity) else it.severity,
+                    suggestion=None,
+                )
+                cur_tokens = _tokenize(cur.description)
+            else:
+                merged.append(cur)
+                cur = it
+                cur_tokens = _tokenize(it.description)
+                cur_descs = [it.description]
+        if cur is not None:
+            merged.append(cur)
+
+    return merged
+
+
+def _budget_work_items(
+    items: List[RiskItem],
+    *,
+    max_total: int,
+    max_per_file: int,
+    max_per_type: Dict[str, int],
+    type_weights: Dict[str, float],
+    severity_weights: Dict[str, float],
+) -> List[RiskItem]:
+    if not items:
+        return []
+
+    def tw(it: RiskItem) -> float:
+        return float(type_weights.get(it.risk_type.value, 1.0))
+
+    def sw(it: RiskItem) -> float:
+        return float(severity_weights.get((it.severity or "warning").lower(), 1.0))
+
+    scored = sorted(items, key=lambda it: (-(it.confidence * tw(it) * sw(it)), -_severity_rank(it.severity), it.file_path, it.line_number))
+
+    selected: List[RiskItem] = []
+    per_file: Dict[str, int] = defaultdict(int)
+    per_type: Dict[str, int] = defaultdict(int)
+    for it in scored:
+        if len(selected) >= int(max_total):
+            break
+        if per_file[it.file_path] >= int(max_per_file):
+            continue
+        cap_t = max_per_type.get(it.risk_type.value)
+        if cap_t is not None and per_type[it.risk_type.value] >= int(cap_t):
+            continue
+        selected.append(it)
+        per_file[it.file_path] += 1
+        per_type[it.risk_type.value] += 1
+    return selected
 
 
 async def manager_node(state: ReviewState) -> Dict[str, Any]:
@@ -49,41 +194,112 @@ async def manager_node(state: ReviewState) -> Dict[str, Any]:
     print(f"  📥 接收文件分析: {len(file_analyses)} 个")
     
     try:
-        work_list = []
-        grouped = defaultdict(list)
-        for file_analyse in file_analyses:
-            for w in file_analyse.potential_risks:
-                key = (w.file_path, w.risk_type, w.line_number)
-                grouped[key].append(w)
+        config = state.get("metadata", {}).get("config")
+        window = int(getattr(getattr(config, "system", None), "manager_anchor_window", 5) or 5)
+        drop_unanchored = bool(getattr(getattr(config, "system", None), "manager_drop_unanchored", True))
+        unanchored_cap = float(getattr(getattr(config, "system", None), "manager_unanchored_confidence", 0.2) or 0.2)
 
-        for key, works in grouped.items():
-            file_path, risk_type, line_number = key
-            descriptions = [w.description for w in works]
-            merged_description = "\n".join(descriptions)
-            confidence = sum(w.confidence for w in works) / len(works)
+        # Build changed-lines map from diff context for anchor checking.
+        contexts = parse_diff_with_line_numbers(diff_context or "")
+        changed_lines_by_file: Dict[str, List[int]] = {}
+        for fp, ctx in contexts.items():
+            try:
+                lines = sorted(set(getattr(ctx, "added_lines", set()) | getattr(ctx, "modified_lines", set())))
+            except Exception:
+                lines = []
+            changed_lines_by_file[_normalize_path(fp)] = lines
 
-            risk_item = RiskItem(
-                risk_type=risk_type,
-                file_path=file_path,
-                line_number=line_number,
-                description=merged_description,
-                confidence=confidence
-                # severity 和 suggestion 使用默认值
-            )
-            work_list.append(risk_item)
+        # Collect all risks from intent analysis.
+        raw_items: List[RiskItem] = []
+        for file_analysis in file_analyses:
+            raw_items.extend(list(file_analysis.potential_risks or []))
 
-
-        # Convert lint_errors to RiskItems and add to work_list
+        # Add lint tasks (high-signal).
         lint_errors = state.get("lint_errors", [])
         if lint_errors:
             lint_risk_items = _convert_lint_errors_to_risk_items(lint_errors)
-            work_list.extend(lint_risk_items)
+            raw_items.extend(lint_risk_items)
             print(f"  📋 添加语法分析任务: {len(lint_risk_items)} 个")
-        
+
+        # Anchor hard-filtering: drop/cap items not near changed lines.
+        anchored_items: List[RiskItem] = []
+        dropped = 0
+        capped = 0
+        for it in raw_items:
+            # Syntax/static errors are already evidence-based and should not be dropped by anchoring.
+            if it.risk_type == RiskType.SYNTAX_STATIC_ERRORS:
+                anchored_items.append(it)
+                continue
+
+            fp = _normalize_path(it.file_path)
+            changed = changed_lines_by_file.get(fp, [])
+            is_anchored = _is_anchored_to_changes(changed, it.line_number, window)
+            if is_anchored:
+                anchored_items.append(it)
+                continue
+
+            if drop_unanchored:
+                dropped += 1
+                continue
+
+            capped += 1
+            anchored_items.append(
+                RiskItem(
+                    risk_type=it.risk_type,
+                    file_path=it.file_path,
+                    line_number=it.line_number,
+                    description=it.description,
+                    confidence=min(it.confidence, unanchored_cap),
+                    severity=it.severity,
+                    suggestion=None,
+                )
+            )
+
+        if dropped or capped:
+            print(f"  🧹 锚点过滤: 丢弃 {dropped} 条, 降置信度 {capped} 条 (window=±{window})")
+
+        # Merge near-duplicates after anchoring.
+        merge_line_window = int(getattr(getattr(config, "system", None), "manager_merge_line_window", 5) or 5)
+        merge_jaccard = float(getattr(getattr(config, "system", None), "manager_merge_jaccard", 0.75) or 0.75)
+        merged_items = _merge_near_duplicates(
+            anchored_items,
+            line_window=merge_line_window,
+            jaccard_threshold=merge_jaccard,
+        )
+
+        # Budgeting / prioritization.
+        max_total = int(getattr(getattr(config, "system", None), "manager_max_work_items_total", 30) or 30)
+        max_per_file = int(getattr(getattr(config, "system", None), "manager_max_items_per_file", 6) or 6)
+        max_per_type = dict(getattr(getattr(config, "system", None), "manager_max_items_per_risk_type", {}) or {})
+        type_weights = dict(getattr(getattr(config, "system", None), "manager_risk_type_weights", {}) or {})
+        sev_weights = dict(getattr(getattr(config, "system", None), "manager_severity_weights", {}) or {})
+
+        # Defaults tuned to reduce "Robustness" noise while keeping high-signal types.
+        if not type_weights:
+            type_weights = {
+                RiskType.SYNTAX_STATIC_ERRORS.value: 1.4,
+                RiskType.CONCURRENCY_TIMING_CORRECTNESS.value: 1.3,
+                RiskType.AUTHORIZATION_DATA_EXPOSURE.value: 1.3,
+                RiskType.LIFECYCLE_STATE_CONSISTENCY.value: 1.1,
+                RiskType.INTENT_SEMANTIC_CONSISTENCY.value: 1.0,
+                RiskType.ROBUSTNESS_BOUNDARY_CONDITIONS.value: 0.7,
+            }
+        if not sev_weights:
+            sev_weights = {"error": 1.3, "warning": 1.0, "info": 0.7}
+
+        work_list = _budget_work_items(
+            merged_items,
+            max_total=max_total,
+            max_per_file=max_per_file,
+            max_per_type=max_per_type,
+            type_weights=type_weights,
+            severity_weights=sev_weights,
+        )
+
         # Group work_list by risk_type
         expert_tasks = _group_tasks_by_risk_type(work_list)
 
-        print(f"  ✅ worklist ")
+        print(f"  ✅ worklist")
 
         print(f"  ✅ Manager 完成! ({elapsed_tag(meta)})")
         print(f"     - 生成任务数: {len(work_list)}")

@@ -10,4 +10,3 @@ zhipuai>=2.0.0  # ZhipuAI SDK (required by ChatZhipuAI)
 tree-sitter>=0.20.0
 unidiff>=0.7.0
 tree-sitter-python>=0.20.0
-

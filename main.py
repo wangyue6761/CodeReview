@@ -41,7 +41,8 @@ async def run_syntax_checking(
     repo_path: Path,
     pr_diff: str,
     base_branch: str,
-    head_branch: str
+    head_branch: str,
+    config: Optional[Config] = None,
 ) -> List[dict]:
     """对变更文件执行语法/静态检查。
     
@@ -57,11 +58,11 @@ async def run_syntax_checking(
     try:
         # Get changed files from Git
         try:
-            changed_files = get_changed_files(repo_path, base_branch, head_branch)
+            changed_files = get_changed_files(repo_path, base_branch, head_branch, config=config)
         except Exception as e:
             print(f"  ⚠️  Warning: Could not get changed files from Git: {e}")
             # Fallback: try to extract from diff
-            changed_files = extract_files_from_diff(pr_diff)
+            changed_files = extract_files_from_diff(pr_diff, config=config)
         
         if not changed_files:
             return []
@@ -314,7 +315,8 @@ async def run_review(
         repo_path=repo_path,
         pr_diff=pr_diff,
         base_branch=base_branch,
-        head_branch=head_branch
+        head_branch=head_branch,
+        config=config,
     )
     
     if lint_errors:
@@ -341,12 +343,12 @@ async def run_review(
     
     # Get changed files list for the workflow
     try:
-        changed_files = get_changed_files(repo_path, base_branch, head_branch)
+        changed_files = get_changed_files(repo_path, base_branch, head_branch, config=config)
     except Exception as e:
         log(f"  ⚠️  Warning: Could not get changed files from Git: {e}")
         # Fallback: try to extract from diff
         try:
-            changed_files = extract_files_from_diff(pr_diff)
+            changed_files = extract_files_from_diff(pr_diff, config=config)
         except Exception as e2:
             log(f"  ⚠️  Warning: Could not extract changed files from diff: {e2}")
             changed_files = []
@@ -361,8 +363,6 @@ async def run_review(
     base_sanitized = base_branch.replace("/", "_").replace("\\", "_").replace("..", "").replace(" ", "_")
     head_sanitized = head_branch.replace("/", "_").replace("\\", "_").replace("..", "").replace(" ", "_")
     
-    # TODO: 临时调试 屏蔽lint_errors
-    lint_errors = []
     try:
         results = await run_multi_agent_workflow(
             diff_context=pr_diff,

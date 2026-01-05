@@ -1,6 +1,7 @@
 """PR（拉取请求）处理工具，用于 diff 加载和结果格式化。"""
 
 import json
+import re
 from pathlib import Path
 from typing import Optional
 
@@ -124,6 +125,28 @@ def print_review_results(
     # Metadata (skip langchain_tools and other verbose fields)
     metadata = results.get("metadata", {})
     if metadata:
+        def _redact_text(s: str) -> str:
+            # Best-effort redaction for accidental secret leakage in object repr / logs.
+            if not isinstance(s, str) or not s:
+                return s
+            patterns = [
+                r"(api_key=)('[^']*'|\"[^\"]*\"|[^,\s]+)",
+                r"(token=)('[^']*'|\"[^\"]*\"|[^,\s]+)",
+                r"(secret=)('[^']*'|\"[^\"]*\"|[^,\s]+)",
+            ]
+            out = s
+            for pat in patterns:
+                out = re.sub(pat, r"\1***REDACTED***", out, flags=re.IGNORECASE)
+            return out
+
+        def _safe_format(v: object) -> str:
+            try:
+                if isinstance(v, str):
+                    return _redact_text(v)
+                return _redact_text(str(v))
+            except Exception:
+                return "<unprintable>"
+
         print(f"\n📊 Metadata:")
         for key, value in metadata.items():
             # Skip printing observations in metadata (will be in log file)
@@ -133,11 +156,11 @@ def print_review_results(
                 print(f"  • {key}: [{len(value) if isinstance(value, list) else 0} tool calls] (saved to log)")
             elif key == "expert_analyses":
                 print(f"  • {key}: [{len(value) if isinstance(value, list) else 0} expert analyses] (saved to log)")
-            elif key in ["llm_provider", "config", "tools", "langchain_tools"]:
+            elif key in ["llm_provider", "config", "tools", "langchain_tools", "llm"]:
                 # Skip non-serializable objects and langchain_tools
                 continue
             else:
-                print(f"  • {key}: {value}")
+                print(f"  • {key}: {_safe_format(value)}")
     
     # Save observations and expert analyses to log files
     if workspace_root and config:

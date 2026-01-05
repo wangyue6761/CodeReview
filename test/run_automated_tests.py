@@ -20,8 +20,8 @@ from typing import Dict, List, Optional, Tuple
 project_root = Path(__file__).parent.parent
 sys.path.insert(0, str(project_root))
 
-# 导入主审查函数
-from main import run_review
+# 注意：不要在模块导入时引入 main/run_review。
+# 这样在仅做用例过滤（甚至过滤后为 0）时，不会触发昂贵的依赖导入或副作用。
 
 
 def extract_pr_number(prlink: str) -> Optional[int]:
@@ -117,25 +117,24 @@ def filter_cases(
     Returns:
         过滤后的用例列表
     """
+    # 先按仓库过滤，再对过滤后的列表应用 cases_range。
+    # 这样 `--repos cal.com --cases 1-1` 表示 “cal.com 的第 1 个用例”，
+    # 而不是 “全局第 1 个用例且 repo_group=cal.com”（后者通常会得到 0 个）。
     filtered = []
-    
-    for i, case in enumerate(all_cases, 1):
-        # 过滤仓库
+
+    for case in all_cases:
         if repos and case["repo_group"] not in repos:
             continue
-        
-        # 过滤case范围
-        if cases_range:
-            start, end = cases_range
-            if end == -1:
-                # 全部
-                pass
-            elif i < start or i > end:
-                continue
-        
         filtered.append(case)
-    
-    return filtered
+
+    if not cases_range:
+        return filtered
+
+    start, end = cases_range
+    start = max(start, 1)
+    if end == -1:
+        return filtered[start - 1 :]
+    return filtered[start - 1 : end]
 
 
 async def run_single_test(
@@ -190,6 +189,9 @@ async def run_single_test(
     placeholder_output = Path("/dev/null")
     
     try:
+        # 延迟导入：只有真正要跑用例时才加载主审查入口
+        from main import run_review
+
         if not quiet:
             print(f"\n{'='*80}")
             print(f"测试用例: {case_name}")
@@ -255,7 +257,7 @@ def parse_arguments() -> argparse.Namespace:
         "--cases",
         type=str,
         default=None,
-        help="要测试前几个case，格式为范围如 '1-10' 表示测试前10个case（默认：全部）"
+        help="要测试的 case 范围（在 repos 过滤后再应用），如 '1-10'；单个数字如 '10' 表示前 10 个（默认：全部）"
     )
     
     parser.add_argument(
@@ -388,4 +390,3 @@ async def main():
 if __name__ == "__main__":
     exit_code = asyncio.run(main())
     sys.exit(exit_code)
-

@@ -1,1 +1,1 @@
-python test/run_automated_tests.py --datasets-dir ~/Code/CodeReviewData/ReviewDataset --repos sentry --cases 2-2
+python test/run_automated_tests.py --datasets-dir ~/Code/CodeReviewData/ReviewDataset --repos grafana --cases 6-6
