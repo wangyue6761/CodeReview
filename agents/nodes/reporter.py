@@ -29,7 +29,7 @@ async def reporter_node(state: ReviewState) -> Dict[str, Any]:
     llm: BaseChatModel = state.get("metadata", {}).get("llm")
     if not llm:
         logger.error("LLM not found in metadata")
-        return {"confirmed_issues": [], "final_report": "Error: LLM not available"}
+        return {"confirmed_issues": [], "final_report": "错误：LLM 不可用"}
     
     expert_results_dicts = state.get("expert_results", {})
     diff_context = state.get("diff_context", "")
@@ -90,7 +90,7 @@ async def reporter_node(state: ReviewState) -> Dict[str, Any]:
         
         # Use standard ChatModel interface
         messages = [
-            SystemMessage(content="You are an expert code reviewer generating a final review report."),
+            SystemMessage(content="你是代码审查专家，请用中文输出最终审查报告。"),
             HumanMessage(content=prompt)
         ]
         response = await llm.ainvoke(messages)
@@ -122,12 +122,12 @@ async def reporter_node(state: ReviewState) -> Dict[str, Any]:
 def _generate_simple_report(confirmed_issues: List[RiskItem]) -> str:
     """从确认的问题生成简单文本报告。"""
     if not confirmed_issues:
-        return "No issues found. Code review completed successfully."
+        return "未发现问题，代码审查已完成。"
     
     report_lines = [
-        "# Code Review Report",
-        f"\nTotal Issues Found: {len(confirmed_issues)}\n",
-        "## Issues by Severity\n"
+        "# 代码审查报告",
+        f"\n问题总数: {len(confirmed_issues)}\n",
+        "## 按严重级别分类\n"
     ]
     
     # Group by severity
@@ -140,7 +140,7 @@ def _generate_simple_report(confirmed_issues: List[RiskItem]) -> str:
     
     for severity in ["error", "warning", "info"]:
         if severity in by_severity:
-            report_lines.append(f"\n### {severity.upper()} ({len(by_severity[severity])})")
+            report_lines.append(f"\n### {severity.upper()}（{len(by_severity[severity])}）")
             for issue in by_severity[severity]:
                 # Format line number range: (10, 15) -> "10:15", (10, 10) -> "10"
                 start_line, end_line = issue.line_number
@@ -156,6 +156,6 @@ def _generate_simple_report(confirmed_issues: List[RiskItem]) -> str:
                     f"  {issue.description}"
                 )
                 if issue.suggestion:
-                    report_lines.append(f"  💡 Suggestion: {issue.suggestion}")
+                    report_lines.append(f"  💡 建议: {issue.suggestion}")
     
     return "\n".join(report_lines)

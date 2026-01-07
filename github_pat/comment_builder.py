@@ -65,7 +65,13 @@ def build_review_comments(
         if start_line in commentable:
             selected_line = start_line
         else:
-            for candidate in range(start_line, max(start_line, end_line) + 1):
+            range_start = start_line
+            range_end = max(start_line, end_line)
+            if max_line_fuzz > 0:
+                range_start = max(1, range_start - max_line_fuzz)
+                range_end = range_end + max_line_fuzz
+
+            for candidate in range(range_start, range_end + 1):
                 if candidate in commentable:
                     selected_line = candidate
                     break

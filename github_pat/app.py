@@ -85,7 +85,8 @@ async def github_webhook(request: Request) -> Response:
 
     comment = payload.get("comment") or {}
     comment_body = str(comment.get("body", ""))
-    if settings.bot_trigger not in comment_body:
+    trigger = (settings.bot_trigger or "").strip()
+    if not trigger or trigger.lower() not in comment_body.lower():
         return Response(status_code=200, content="ignored")
 
     repo = payload.get("repository") or {}

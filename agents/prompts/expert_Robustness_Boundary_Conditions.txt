@@ -57,3 +57,9 @@
 - `qs[a:b]`：不支持负 `start/stop`（Django 6.0 抛 `ValueError`）；无 `step` 时返回惰性的 `QuerySet`，有 `step` 时返回已求值的 `list`。
 - `qs.earliest()/latest()`：空结果会走 `get()` → `DoesNotExist`；对已切片的 queryset 调用会抛 `TypeError`（“Cannot change a query once a slice has been taken.”）。
 - `qs.aggregate(...)`：返回 `dict`，聚合值可能为 `None`（例如空结果或全 NULL）。
+
+### Java `Optional`
+- `Optional.get()` 在未 `isPresent()` 时会抛 `NoSuchElementException`。
+
+### JavaScript `JSON.parse`
+- 输入格式不合法会抛异常，需要 try/catch 或提前校验。

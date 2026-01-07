@@ -13,6 +13,7 @@ from util import (
     get_changed_files,
     get_git_diff,
     get_git_info,
+    save_observations_to_log,
     validate_repo_path,
 )
 from util.lite_cpg_utils import prepare_lite_cpg_db
@@ -87,6 +88,16 @@ async def run_review_for_pr(
         config=config,
         lint_errors=lint_errors,
     )
+    try:
+        save_observations_to_log(
+            results,
+            repo_path,
+            config,
+            base_branch=base_branch,
+            head_branch=head_branch,
+        )
+    except Exception:
+        pass
     results["__pr_diff"] = pr_diff
     results["__base_branch"] = base_branch
     results["__head_branch"] = head_branch
